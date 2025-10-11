@@ -1399,7 +1399,7 @@ config("angle_static_config") {
 }
 
 set_defaults("angle_libGLESv2") {
-  sources = ["renderer/vulkan/angle_vulkan_driver_stubs.cpp"]
+  sources = []
   output_name = "libGLESv2"
 }
 
@@ -1587,7 +1587,7 @@ if (angle_enable_vulkan) {
     defines = [ "ANGLE_DISPATCH_LIBRARY=\"${_angle_glesv2_vulkan_secondaries_library_name}\"" ]
     output_name = "libEGL_vulkan_secondaries"
     gles_library = "libGLESv2_vulkan_secondaries"
-    sources = ["renderer/vulkan/angle_vulkan_driver_stubs.cpp"]
+    sources = []
     if (is_win) {
       sources += [ "src/libEGL/libEGL_vulkan_secondaries_autogen.def" ]
     }
