@@ -117,7 +117,7 @@ jobs:
           angle_enable_custom_vulkan_outside_render_pass_cmd_buffers = true
           angle_enable_custom_vulkan_render_pass_cmd_buffers = true
           angle_use_gbm = false
-          use_clang_coverage = false
+          # use_clang_coverage = false
           use_sanitizer_coverage = false
           use_ghash = true
           coverage_instrumentation_input_file = \"\"
