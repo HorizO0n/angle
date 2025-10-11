@@ -220,6 +220,7 @@ jobs:
           enable_new_standalone_webview_settings = false
           enable_baseline_profiles = true
           enable_call_graph_profile_sort = true
+          angle_enable_crc_for_pipeline_cache = false
           " > out/Android-${{ matrix.arch }}/args.gn
 
           gn gen out/Android-${{ matrix.arch }} --threads=$(nproc)
