@@ -104,7 +104,7 @@ jobs:
           use_relative_vtables_abi = true
           init_stack_vars = false
           init_stack_vars_zero = false
-          target_environment = \"device\"
+          # target_environment = \"device\"
           msan_check_use_after_dtor = false
           msan_eager_checks = false
           msan_track_origins = 0
