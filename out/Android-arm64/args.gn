@@ -58,3 +58,4 @@ android_static_analysis = "off"
 # THIS IS CURRENTLY EXPERIMENTAL.
 angle_ir = false ####or true
 perfetto_verbose_logs_enabled = false
+angle_enable_perfetto = false
