@@ -3026,33 +3026,33 @@ angle::ImageLoadContext Display::getImageLoadContext() const
     return imageLoadContext;
 }
 
-ANGLE_INLINE const gl::Context *Display::getContext(gl::ContextID contextID) const
+const gl::Context *Display::getContext(gl::ContextID contextID) const
 {
     return mState.contextMap.find(contextID);
 }
 
-ANGLE_INLINE const egl::Surface *Display::getSurface(egl::SurfaceID surfaceID) const
+const egl::Surface *Display::getSurface(egl::SurfaceID surfaceID) const
 {
     return mState.surfaceMap.find(surfaceID);
 }
 
-ANGLE_INLINE const egl::Image *Display::getImage(egl::ImageID imageID) const
+const egl::Image *Display::getImage(egl::ImageID imageID) const
 {
 auto iter = mImageMap.find(imageID.value);
      return iter != mImageMap.end() ? iter->second : nullptr;
 }
 
-ANGLE_INLINE gl::Context *Display::getContext(gl::ContextID contextID)
+gl::Context *Display::getContext(gl::ContextID contextID)
 {
      return mState.contextMap.find(contextID);
 }
 
-ANGLE_INLINE egl::Surface *Display::getSurface(egl::SurfaceID surfaceID)
+egl::Surface *Display::getSurface(egl::SurfaceID surfaceID)
 {
      return mState.surfaceMap.find(surfaceID);
 }
 
-ANGLE_INLINE egl::Image *Display::getImage(egl::ImageID imageID)
+egl::Image *Display::getImage(egl::ImageID imageID)
 {
     auto iter = mImageMap.find(imageID.value);
     return iter != mImageMap.end() ? iter->second : nullptr;
