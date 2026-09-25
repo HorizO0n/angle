@@ -8413,8 +8413,9 @@ bool ValidateTexStorageMultisample(const Context *context,
     const TextureCaps &formatCaps = context->getTextureCaps().get(internalFormat);
     if (!formatCaps.textureAttachment)
     {
-        ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kRenderableInternalFormat);
-        return false;
+        //ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kRenderableInternalFormat);
+        WARN() << "SizedInternalformat must be color-renderable, depth-renderable, or stencil-renderable.";
+        //return false;
     }
 
     // The ES3.1 spec(section 8.8) states that an INVALID_ENUM error is generated if internalformat
