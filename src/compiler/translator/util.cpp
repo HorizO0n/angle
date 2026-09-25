@@ -912,7 +912,7 @@ bool IsInShaderStorageBlock(TIntermTyped *node)
     return type.getQualifier() == EvqBuffer;
 }
 
-GLenum GetImageInternalFormatType(TLayoutImageInternalFormat iifq)
+GLenum GetImageInternalFormatType(TLayoutImageInternalFormat iifq, TBasicType basicType)
 {
     switch (iifq)
     {
@@ -960,6 +960,29 @@ GLenum GetImageInternalFormatType(TLayoutImageInternalFormat iifq)
             return GL_RGBA8;
         case EiifRGBA8_SNORM:
             return GL_RGBA8_SNORM;
+        case EiifUnspecified:
+            // ParseContext::nonEmptyDeclarationErrorCheck only warns when an image uniform
+            // omits its layout format qualifier.  The Vulkan backend requires a concrete
+            // format to build the descriptor set layout and to validate glBindImageTexture.
+            // If we return GL_NONE here, the program links with an undefined image format
+            // and later state synchronization inside glUseProgram dereferences the
+            // uninitialized field and crashes at si_addr = 0xa0.
+            //
+            // Pick a default consistent with the image's basic type so the SPIR-V
+            // declaration and the descriptor set layout agree.
+            if (IsFloatImage(basicType))
+            {
+                return GL_RGBA32F;
+            }
+            if (IsIntegerImage(basicType))
+            {
+                return GL_RGBA32I;
+            }
+            if (IsUnsignedImage(basicType))
+            {
+                return GL_RGBA32UI;
+            }
+            return GL_NONE;
         default:
             return GL_NONE;
     }

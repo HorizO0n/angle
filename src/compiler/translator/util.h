@@ -95,7 +95,8 @@ bool IsOutputWGSL(ShShaderOutput output);
 
 bool IsInShaderStorageBlock(TIntermTyped *node);
 
-GLenum GetImageInternalFormatType(TLayoutImageInternalFormat iifq);
+GLenum GetImageInternalFormatType(TLayoutImageInternalFormat iifq, TBasicType basicType);
+
 // ESSL 1.00 shaders nest function body scope within function parameter scope
 bool IsSpecWithFunctionBodyNewScope(ShShaderSpec shaderSpec, int shaderVersion);
 

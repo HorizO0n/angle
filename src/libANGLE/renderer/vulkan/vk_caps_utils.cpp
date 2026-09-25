@@ -534,7 +534,8 @@ void Renderer::ensureCapsInitialized() const
     // enabled
     mNativeExtensions.sRGBWriteControlEXT =
         getFeatures().supportsSwapchainMutableFormat.enabled ||
-         getFeatures().exposeNonConformantExtensionsAndVersions.enabled;
+        (getFeatures().supportsImageFormatList.enabled &&
+         getFeatures().exposeNonConformantExtensionsAndVersions.enabled);
 
     // Vulkan natively supports io interface block.
     mNativeExtensions.shaderIoBlocksOES = true;
