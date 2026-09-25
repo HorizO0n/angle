@@ -531,10 +531,10 @@ void Renderer::ensureCapsInitialized() const
 
     // Enable EXT_srgb_write_control if either of these conditions are met -
     // - VK_KHR_swapchain_mutable_format is supported
-    // - exposeNonConformantExtensionsAndVersions is enabled
+    // enabled
     mNativeExtensions.sRGBWriteControlEXT =
         getFeatures().supportsSwapchainMutableFormat.enabled ||
-        getFeatures().exposeNonConformantExtensionsAndVersions.enabled;
+         getFeatures().exposeNonConformantExtensionsAndVersions.enabled;
 
     // Vulkan natively supports io interface block.
     mNativeExtensions.shaderIoBlocksOES = true;
@@ -845,22 +845,13 @@ void Renderer::ensureCapsInitialized() const
     maxPerStageStorageBuffers -= maxPerStageAtomicCounterBuffers;
     maxCombinedStorageBuffers -= maxCombinedAtomicCounterBuffers;
 
-    mNativeCaps.maxShaderStorageBlocks[gl::ShaderType::Vertex] =
-        mPhysicalDeviceFeatures.vertexPipelineStoresAndAtomics
-            ? rx::LimitToInt(maxVertexStageStorageBuffers)
-            : 0;
-    mNativeCaps.maxShaderStorageBlocks[gl::ShaderType::Fragment] =
-        mPhysicalDeviceFeatures.fragmentStoresAndAtomics ? rx::LimitToInt(maxPerStageStorageBuffers)
-                                                         : 0;
-    if (std::getenv("ANGLE_FAKE_MAXSHADERSTORAGEBLOCKS")) {
         mNativeCaps.maxShaderStorageBlocks[gl::ShaderType::Vertex] =
           mPhysicalDeviceFeatures.vertexPipelineStoresAndAtomics
               ? rx::LimitToInt(maxVertexStageStorageBuffers)
-              : 512 * 1024 * 1024;
+              : 4096;
         mNativeCaps.maxShaderStorageBlocks[gl::ShaderType::Fragment] =
           mPhysicalDeviceFeatures.fragmentStoresAndAtomics ? rx::LimitToInt(maxPerStageStorageBuffers)
-                                                           : 512 * 1024 * 1024;
-    }
+                                                           : 4096;
     mNativeCaps.maxShaderStorageBlocks[gl::ShaderType::Compute] =
         rx::LimitToInt(maxPerStageStorageBuffers);
     mNativeCaps.maxCombinedShaderStorageBlocks = rx::LimitToInt(maxCombinedStorageBuffers);

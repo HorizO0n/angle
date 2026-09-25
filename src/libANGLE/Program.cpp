@@ -805,7 +805,12 @@ ShaderProgramID Program::id() const
 
 angle::Result Program::setLabel(const Context *context, const std::string &label)
 {
-    //ASSERT(!mLinkingState);
+
+    if (mLinkingState)
+    {
+        resolveLinkImpl(context);
+    }
+
     mState.mLabel = label;
 
     if (mProgram)

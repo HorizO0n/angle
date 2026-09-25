@@ -6632,7 +6632,7 @@ void Renderer::initFeatures(const vk::ExtensionNameList &deviceExtensionNames,
     //
     // When VK_EXT_graphics_pipeline_library is used, warm up is always enabled as the chances of
     // blobs being reused is very high.
-    const bool libraryBlobsAreReusedByMonolithicPipelines = !isARMProprietary && !isPowerVR;
+    const bool libraryBlobsAreReusedByMonolithicPipelines = !isPowerVR;
     ANGLE_FEATURE_CONDITION(
         &mFeatures, warmUpPipelineCacheAtLink,
         mFeatures.supportsGraphicsPipelineLibrary.enabled ||

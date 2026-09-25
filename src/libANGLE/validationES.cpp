@@ -4306,7 +4306,7 @@ const char *ValidateDrawStates(const Context *context, GLenum *outErrorCode)
             }
 
             // Validate that we are rendering with a linked program.
-            if (program != nullptr && !program->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+            if (program != nullptr && !program->isLinked())
             {
                 return kProgramNotLinked;
             }
@@ -4599,7 +4599,7 @@ bool ValidateGetUniformBase(const Context *context,
         return false;
     }
 
-    if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED") )
+    if (!programObject->isLinked())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
         return false;
@@ -5025,7 +5025,7 @@ bool ValidateGetProgramBinaryBase(const Context *context,
         return false;
     }
 
-    if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED") )
+    if (!programObject->isLinked())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
         return false;
@@ -5928,7 +5928,7 @@ bool ValidateGetProgramivBase(const Context *context,
             // An INVALID_OPERATION error is generated if COMPUTE_WORK_GROUP_SIZE is queried for a
             // program which has not been linked successfully, or which does not contain objects to
             // form a compute shader.
-            if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED") )
+            if (!programObject->isLinked())
             {
                 ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
                 return false;
@@ -5956,7 +5956,7 @@ bool ValidateGetProgramivBase(const Context *context,
             // GEOMETRY_LINKED_INPUT_TYPE_EXT, GEOMETRY_LINKED_OUTPUT_TYPE_EXT, or
             // GEOMETRY_SHADER_INVOCATIONS_EXT are queried for a program which has not been linked
             // successfully, or which does not contain objects to form a geometry shader.
-            if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+            if (!programObject->isLinked())
             {
                 ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
                 return false;
@@ -5982,7 +5982,7 @@ bool ValidateGetProgramivBase(const Context *context,
                 ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kTessellationShaderEXTNotEnabled);
                 return false;
             }
-            if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+            if (!programObject->isLinked())
             {
                 ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
                 return false;
@@ -6004,7 +6004,7 @@ bool ValidateGetProgramivBase(const Context *context,
                 ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kTessellationShaderEXTNotEnabled);
                 return false;
             }
-            if (!programObject->isLinked()  && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+            if (!programObject->isLinked())
             {
                 ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
                 return false;

@@ -4930,7 +4930,7 @@ bool ValidateGetAttribLocation(const Context *context,
         return false;
     }
 
-    if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+    if (!programObject->isLinked())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
         return false;

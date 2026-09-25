@@ -458,7 +458,8 @@ angle::Result ProgramGL::linkJobImpl(const gl::Extensions &extensions)
         {
             const gl::SharedCompiledShaderState &fragmentShader =
                 mState.getAttachedShader(gl::ShaderType::Fragment);
-            if (fragmentShader && fragmentShader->shaderVersion == 100)
+            if (fragmentShader && fragmentShader->shaderVersion == 100 &&
+                mFunctions->standard == STANDARD_GL_DESKTOP)
             {
                 ASSERT(!mFeatures.avoidBindFragDataLocation.enabled);
 

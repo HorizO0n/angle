@@ -1485,7 +1485,7 @@ bool ValidateGetProgramResourceLocation(const Context *context,
         return false;
     }
 
-    if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+    if (!programObject->isLinked())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
         return false;
@@ -1706,7 +1706,7 @@ bool ValidateUseProgramStagesBase(const Context *context,
 
     // GL_INVALID_OPERATION is generated if program refers to a program object that has not been
     // successfully linked.
-    if (!program->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+    if (!program->isLinked())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
         return false;
@@ -1747,7 +1747,7 @@ bool ValidateActiveShaderProgramBase(const Context *context,
     // An INVALID_OPERATION error is generated if program is not zero and has not been linked, or
     // was last linked unsuccessfully. The active program is not modified.
     Program *program = context->getProgramNoResolveLink(programId);
-    if ((programId.value != 0) && !program->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+    if ((programId.value != 0) && !program->isLinked())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
         return false;
@@ -2524,7 +2524,7 @@ bool ValidateGetProgramResourceLocationIndexEXT(const Context *context,
         return false;
     }
 
-    if (!programObject->isLinked() && !std::getenv("ANGLE_IGNORE_PROGEAMNOTLINKED"))
+    if (!programObject->isLinked())
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, kProgramNotLinked);
         return false;
