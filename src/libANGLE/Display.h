@@ -492,6 +492,8 @@ class Display final : public angle::ObserverInterface, public ThreadSafeDisplay
 
     angle::ImageLoadContext getImageLoadContext() const;
 
+    // Hot lookups: defined inline in the header so callers across translation units can avoid the
+    // call overhead and let the compiler fold the surrounding validation checks.
     const gl::Context *getContext(gl::ContextID contextID) const;
     const egl::Surface *getSurface(egl::SurfaceID surfaceID) const;
     const egl::Image *getImage(egl::ImageID imageID) const;
@@ -592,6 +594,12 @@ class Display final : public angle::ObserverInterface, public ThreadSafeDisplay
     angle::SimpleMutex mScratchBufferMutex;
     std::vector<angle::ScratchBuffer> mScratchBuffers;
     std::vector<angle::ScratchBuffer> mZeroFilledBuffers;
+
+    // Tracks the total number of buffers currently sitting in mScratchBuffers and
+    // mZeroFilledBuffers.  Lets Display::makeCurrent skip the mutex acquisition and the tick loop
+    // entirely when both pools are empty, which is the common case.  Written under
+    // mScratchBufferMutex, read without holding it.
+    mutable std::atomic<uint32_t> mScratchBufferPoolSize{0};
 
     bool mTerminatedByApi;
 
