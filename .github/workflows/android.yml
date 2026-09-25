@@ -1,98 +1,135 @@
-name: ANGLE
+name: ANGLE Android
 
 on:
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
-  build:
+  build-android:
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        arch: [ "x86", "x86_64", "arm32", "arm64", "arm64-fastdebug"] # "x86_64", "arm32",
-      fail-fast: false
-
-    name: "Build for Android ${{matrix.arch}}"
-    runs-on: ubuntu-24.04
+        arch: [arm64, arm32]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
-        with:
-          fetch-depth: 1
+      - name: Checkout ANGLE source
+        uses: actions/checkout@v4
 
-      - name: Cache depot_tools
-        id: cache-depot-tools
-        uses: actions/cache@main
-        with:
-          path: |
-                depot_tools
-                third_party/llvm-build
-                tools/flex-bison
-          key: depot-tools-${{ runner.os }}-${{ hashFiles('.gclient') }}
-          restore-keys: |
-            depot-tools-${{ runner.os }}-
-
-      - name: Setup depot_tools
-        if: steps.cache-depot-tools.outputs.cache-hit != 'true'
-        shell: bash
+      - name: Install depot_tools
         run: |
-          sudo rm -rf /usr/local/lib/android/sdk
-          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+        env:
+          DEPOT_TOOLS_UPDATE: 0
 
-      - name: Run gclient sync
-        shell: bash
+      - name: Ensure depot_tools bootstrap
         run: |
-          export PATH=`pwd`/depot_tools:$PATH
-
-          if [ ! -f .gclient ]; then
-            python3 scripts/bootstrap.py
-          fi
-
-          COMMIT_COUNT=$(git ls-remote origin | wc -l)
-          echo "ANGLE_COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
-          echo "DEPOT_TOOLS_COMMIT=$(git -C depot_tools rev-parse HEAD)" >> $GITHUB_ENV
-          echo $PATH
-
-          gclient sync --no-history --shallow --reset --force
-
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@main
-        with:
-          key: 'angle-ccache'
-          max-size: '8G'
-          update-package-index: 'true'
-
-      - name: Build ANGLE
+          export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
+          ensure_bootstrap
         shell: bash
+        env:
+          DEPOT_TOOLS_UPDATE: 0
+
+      - name: Generate .gclient file
         run: |
-          COMMIT_COUNT=$(git ls-remote origin | wc -l)
-          echo "ANGLE_COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
-          echo "DEPOT_TOOLS_COMMIT=$(git -C depot_tools rev-parse HEAD)" >> $GITHUB_ENV
-          export PATH=`pwd`/depot_tools:$PATH
-          export NDK_CCACHE="ccache"
-          echo $PATH
-          cp .gn .gn.bak 2>/dev/null; if grep -q 'expand_directory_allowlist' .gn 2>/dev/null; then sed -i 's|]|,\n  "//build/modules/BUILD.gn"\n]|' .gn; else echo 'expand_directory_allowlist = [ "//build/modules/BUILD.gn" ]' >> .gn; fi
-          gn gen out/Android-${{matrix.arch}} --threads=$(nproc)
+          cat > .gclient <<EOF
+          solutions = [
+            {
+              "name": ".",
+              "url": "https://chromium.googlesource.com/angle/angle.git",
+              "deps_file": "DEPS",
+              "managed": False,
+              "custom_deps": {
+                "third_party/gles1_conform": None,
+                #"testing/libfuzzer": None,
+                #"third_party/catapult/tracing": None,
+                #"third_party/cherry": None,
+                #"third_party/colorama/src": None,
+                #"third_party/clspv/src": None,
+                #"third_party/cpu_features/src/ndk_compat": None,
+                #"third_party/dawn": None,
+                #"third_party/glmark2/src": None,
+                #"third_party/astc-encoder/src": None,
+                #"third_party/perfetto": None,
+                #"third_party/wayland": None,
+                #"third_party/OpenCL-CTS/src": None,
+                #"tools/valgrind": None,
+                #"third_party/jsoncpp/fuzzers": None,
+                #"third_party/OpenCL-Docs": None,
+                #"third_party/googletest": None,
+                #"third_party/OpenCL-ICD-Loader": None,
+                #"third_party/logdog/logdog": None,
+                #"third_party/VK-GL-CTS": None,
+                #"third_party/lunarg-vulkantools/src": None,
+                #"third_party/vulkan-headers": None,
+                #"third_party/rust": None,
+                #"third_party/vulkan_memory_allocator/tools": None,
+                #"third_party/libunwind/libunwind": None,
+                #"third_party/libpng/src": None,
+                #"third_party/vulkan-validation-layers": None,
+                #"third_party/vulkan-utility-libraries": None,
+                #"third_party/llvm/src": None,
+                #"third_party/libjpeg_turbo": None,
+                #"third_party/six": None,
+                #"third_party/Python-Markdown": None,
+                #"third_party/requests/src": None,
+                #"tools/memory": None,
+                #"tools/mb": None,
+                #"tools/mb_browser": None,
+                #"src/compiler/translator/fuzz": None,
+                #"src/compiler/translator/ir/src": None,
+                #"src/common/third_party/xxhash": None,
+                #"third_party/libc++abi": None
+              }
+            }
+          ]
+          target_os = ['android']
+          target_cpu = ['${{ matrix.arch }}']
+          EOF
+
+      - name: Sync dependencies
+        run: |
+          export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
+          gclient sync --no-history --force
+        env:
+          DEPOT_TOOLS_UPDATE: 0
+          
+      - name: Install ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+
+      - name: Build with GN + Ninja
+        run: |
+          export PATH="$GITHUB_WORKSPACE/depot_tools:$PATH"
+
+          echo "==== Running GN GEN ===="
+          gn gen out/Android-${{ matrix.arch }} 
+
+          echo "==== GN ARGS (active) ===="
           gn args out/Android-${{ matrix.arch }} --list --short
-          autoninja -C out/Android-${{matrix.arch}} -j $(nproc)
 
-      - name: Dump logs on failure
+          autoninja -C out/Android-${{ matrix.arch }} angle_apks -j$(nproc)
+
+      - name: Dump SISO logs on failure
         if: failure()
-        shell: bash
         run: |
-          find out/Android-${{matrix.arch}} -name "siso_output" -exec cat {} \;
-          chmod +x ./out/Android-${{matrix.arch}}/siso_failed_commands.sh
-          ./out/Android-${{matrix.arch}}/siso_failed_commands.sh
+          OUTPUT_DIR="out/Android-${{ matrix.arch }}"
+          find $OUTPUT_DIR -name "siso_output" -exec cat {} \; || true
+          chmod +x $OUTPUT_DIR/siso_failed_commands.sh || true
+          $OUTPUT_DIR/siso_failed_commands.sh || true
 
-      - name: Upload angle
-        uses: actions/upload-artifact@main
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
         with:
-          name: angle-${{matrix.arch}}-${{ github.run_number }}
-          path: out/Android-${{matrix.arch}}/*.so
+          name: angle-apks-${{ matrix.arch }}
+          path: out/Android-${{ matrix.arch }}/apks
 
-      # - name: Upload libc++
-      #   uses: actions/upload-artifact@main
-      #   with:
-      #     name: libc++-${{matrix.arch}}-${{ github.run_number }}
-      #    path: |
-      #          **/gen/third_party/libc++
-      #          **/obj/buildtools/third_party/libc++abi
+      - name: Upload libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: angle-libs-${{ matrix.arch }}
+          path: out/Android-${{ matrix.arch }}/*.so
