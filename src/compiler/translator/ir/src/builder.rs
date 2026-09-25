@@ -841,6 +841,7 @@ impl Builder {
                 vec![],
                 TYPE_ID_VOID,
                 Precision::NotApplicable,
+                false,
                 Decorations::new_none(),
             );
             let wrapped_main = self.ir.add_function(wrapped_main);
@@ -941,6 +942,7 @@ impl Builder {
         name: Name,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
         built_in: Option<BuiltIn>,
         scope: VariableScope,
@@ -963,7 +965,7 @@ impl Builder {
         let variable_id = self
             .ir
             .meta
-            .declare_variable(name, type_id, precision, decorations, built_in, None, scope)
+            .declare_variable(name, type_id, precision, precise, decorations, built_in, None, scope)
             .0;
 
         // Add the variable to the list of local variables in this scope, if not global.  Function
@@ -986,6 +988,7 @@ impl Builder {
         built_in: BuiltIn,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
     ) -> VariableId {
         // Note: the name of the built-in is not derived.  For text-based generators, the name can
@@ -997,6 +1000,7 @@ impl Builder {
             Name::new_exact(""),
             type_id,
             precision,
+            precise,
             decorations,
             Some(built_in),
             VariableScope::Global,
@@ -1010,12 +1014,14 @@ impl Builder {
         name: &'static str,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
     ) -> VariableId {
         self.declare_variable(
             Name::new_interface(name),
             type_id,
             precision,
+            precise,
             decorations,
             None,
             VariableScope::Global,
@@ -1029,6 +1035,7 @@ impl Builder {
         name: &'static str,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
     ) -> VariableId {
         let scope = if self.current_function.is_none() {
@@ -1037,12 +1044,25 @@ impl Builder {
             VariableScope::Local
         };
 
-        self.declare_variable(Name::new_temp(name), type_id, precision, decorations, None, scope)
+        self.declare_variable(
+            Name::new_temp(name),
+            type_id,
+            precision,
+            precise,
+            decorations,
+            None,
+            scope,
+        )
     }
 
     // Declare a const temporary variable.  The name of this variable is ultimately unused.
-    pub fn declare_const_variable(&mut self, type_id: TypeId, precision: Precision) -> VariableId {
-        self.ir.meta.declare_const_variable(Name::new_temp(""), type_id, precision)
+    pub fn declare_const_variable(
+        &mut self,
+        type_id: TypeId,
+        precision: Precision,
+        precise: bool,
+    ) -> VariableId {
+        self.ir.meta.declare_const_variable(Name::new_temp(""), type_id, precision, precise)
     }
 
     // Rescope a temporary variable to a `for` loop variable declared in its initializer
@@ -1062,7 +1082,10 @@ impl Builder {
         self.ir.meta.get_variable_mut(variable_id).decorations.add_invariant();
     }
     fn mark_variable_precise(&mut self, variable_id: VariableId) {
-        self.ir.meta.get_variable_mut(variable_id).decorations.add_precise();
+        self.ir.meta.get_variable_mut(variable_id).precise = true;
+    }
+    fn mark_texel_fetch_use(&mut self, variable_id: VariableId, fields: &[u32]) {
+        self.ir.meta.mark_texel_fetch_use(variable_id, fields);
     }
 
     // When a function prototype is encountered, the following functions are called:
@@ -1088,10 +1111,17 @@ impl Builder {
         params: Vec<FunctionParam>,
         return_type_id: TypeId,
         return_precision: Precision,
+        return_precise: bool,
         return_decorations: Decorations,
     ) -> FunctionId {
-        let function =
-            Function::new(name, params, return_type_id, return_precision, return_decorations);
+        let function = Function::new(
+            name,
+            params,
+            return_type_id,
+            return_precision,
+            return_precise,
+            return_decorations,
+        );
         let is_main = name == "main";
 
         let id = self.ir.add_function(function);
@@ -1134,6 +1164,7 @@ impl Builder {
         name: &'static str,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
         direction: FunctionParamDirection,
     ) -> VariableId {
@@ -1141,6 +1172,7 @@ impl Builder {
             Name::new_temp(name),
             type_id,
             precision,
+            precise,
             decorations,
             None,
             VariableScope::FunctionParam,
@@ -1820,6 +1852,7 @@ impl Builder {
                 name,
                 TYPE_ID_INT,
                 Precision::Low,
+                false,
                 Decorations::new_none(),
                 None,
                 VariableScope::Global,
@@ -3284,6 +3317,7 @@ pub mod ffi {
         fn rescope_as_for_loop_variable(self: &mut BuilderWrapper, variable_id: VariableId);
         fn mark_variable_invariant(self: &mut BuilderWrapper, variable_id: VariableId);
         fn mark_variable_precise(self: &mut BuilderWrapper, variable_id: VariableId);
+        fn mark_texel_fetch_use(self: &mut BuilderWrapper, variable_id: VariableId, fields: &[u32]);
         fn new_function(
             self: &mut BuilderWrapper,
             name: &'static str,
@@ -4211,9 +4245,6 @@ impl BuilderWrapper {
         if ast_type.invariant {
             decorations.decorations.push(Decoration::Invariant);
         }
-        if ast_type.precise {
-            decorations.decorations.push(Decoration::Precise);
-        }
         if ast_type.interpolant {
             decorations.decorations.push(Decoration::Interpolant);
         }
@@ -4394,6 +4425,7 @@ impl BuilderWrapper {
                     },
                     field.ast_type.type_id.into(),
                     field.ast_type.precision.into(),
+                    field.ast_type.precise,
                     Self::ast_type_decorations(&field.ast_type),
                 )
             })
@@ -4562,6 +4594,7 @@ impl BuilderWrapper {
                 built_in,
                 ast_type.type_id.into(),
                 ast_type.precision.into(),
+                ast_type.precise,
                 Self::ast_type_decorations(ast_type),
             );
 
@@ -4584,6 +4617,7 @@ impl BuilderWrapper {
                 name,
                 ast_type.type_id.into(),
                 ast_type.precision.into(),
+                ast_type.precise,
                 Self::ast_type_decorations(ast_type),
             )
         }
@@ -4596,12 +4630,17 @@ impl BuilderWrapper {
         ast_type: &ffi::ASTType,
     ) -> ffi::VariableId {
         if ast_type.qualifier == ffi::ASTQualifier::Const {
-            self.builder.declare_const_variable(ast_type.type_id.into(), ast_type.precision.into())
+            self.builder.declare_const_variable(
+                ast_type.type_id.into(),
+                ast_type.precision.into(),
+                ast_type.precise,
+            )
         } else {
             self.builder.declare_temp_variable(
                 name,
                 ast_type.type_id.into(),
                 ast_type.precision.into(),
+                ast_type.precise,
                 Self::ast_type_decorations(ast_type),
             )
         }
@@ -4618,6 +4657,10 @@ impl BuilderWrapper {
 
     fn mark_variable_precise(&mut self, variable_id: ffi::VariableId) {
         self.builder.mark_variable_precise(variable_id.into());
+    }
+
+    fn mark_texel_fetch_use(&mut self, variable_id: ffi::VariableId, fields: &[u32]) {
+        self.builder.mark_texel_fetch_use(variable_id.into(), fields);
     }
 
     fn function_param_direction(qualifier: ffi::ASTQualifier) -> FunctionParamDirection {
@@ -4653,6 +4696,7 @@ impl BuilderWrapper {
                 params,
                 return_type_id.into(),
                 return_ast_type.precision.into(),
+                return_ast_type.precise,
                 Self::ast_type_decorations(return_ast_type),
             )
             .into()
@@ -4682,6 +4726,7 @@ impl BuilderWrapper {
                 name,
                 type_id.into(),
                 ast_type.precision.into(),
+                ast_type.precise,
                 Self::ast_type_decorations(ast_type),
                 Self::function_param_direction(direction),
             )

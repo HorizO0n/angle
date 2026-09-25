@@ -416,7 +416,7 @@ TEST_P(FramebufferFormatsTest, ReadDrawCompleteness)
 
     EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT,
                      glCheckFramebufferStatus(GL_READ_FRAMEBUFFER));
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
 
     ASSERT_GL_NO_ERROR();
 
@@ -442,7 +442,7 @@ TEST_P(FramebufferFormatsTest, RGBA8Renderbuffer)
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo);
 
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     ASSERT_GL_NO_ERROR();
 
@@ -466,7 +466,7 @@ TEST_P(FramebufferFormatsTest, RGB8AndRGBA8Renderbuffers)
     GLFramebuffer fbo;
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo1);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
     ASSERT_GL_NO_ERROR();
 
     glClearColor(1.0, 1.0, 1.0, 0.1);
@@ -474,7 +474,7 @@ TEST_P(FramebufferFormatsTest, RGB8AndRGBA8Renderbuffers)
     EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::white);
 
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo2);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
     ASSERT_GL_NO_ERROR();
 
     glClearColor(1.0, 0.0, 0.0, 1.0);
@@ -497,7 +497,7 @@ TEST_P(FramebufferFormatsTest, RGB565Renderbuffer)
     glBindFramebuffer(GL_FRAMEBUFFER, completeFBO);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo);
 
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     ASSERT_GL_NO_ERROR();
 
@@ -519,7 +519,7 @@ TEST_P(FramebufferFormatsTest, RGBA4Renderbuffer)
     glBindFramebuffer(GL_FRAMEBUFFER, completeFBO);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo);
 
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     ASSERT_GL_NO_ERROR();
 
@@ -541,7 +541,7 @@ TEST_P(FramebufferFormatsTest, RGB5A1Renderbuffer)
     glBindFramebuffer(GL_FRAMEBUFFER, completeFBO);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo);
 
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     ASSERT_GL_NO_ERROR();
 
@@ -563,7 +563,7 @@ TEST_P(FramebufferFormatsTest, RGB8Renderbuffer)
     glBindFramebuffer(GL_FRAMEBUFFER, completeFBO);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo);
 
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     ASSERT_GL_NO_ERROR();
 
@@ -1818,6 +1818,9 @@ TEST_P(FramebufferTest_ES3, ClearTextureActiveRenderAttachmentColorOtherLevel)
 
     ASSERT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     // just add components
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
@@ -2129,8 +2132,12 @@ void main()
                      GL_UNSIGNED_BYTE, nullptr);
     }
 
-    GLenum allBufs[kDrawBufferCount] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
-                                        GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+    constexpr std::array<GLenum, kDrawBufferCount> allBufs = {
+        GL_COLOR_ATTACHMENT0,
+        GL_COLOR_ATTACHMENT1,
+        GL_COLOR_ATTACHMENT2,
+        GL_COLOR_ATTACHMENT3,
+    };
 
     GLFramebuffer fbo;
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
@@ -2142,7 +2149,7 @@ void main()
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + texIndex, GL_TEXTURE_2D,
                                textures[texIndex], 0);
     }
-    glDrawBuffers(kDrawBufferCount, allBufs);
+    glDrawBuffers(kDrawBufferCount, allBufs.data());
 
     // Draw with simple program.
     drawQuad(program, essl3_shaders::PositionAttrib(), 0.5f, 1.0f, true);
@@ -2678,7 +2685,7 @@ TEST_P(FramebufferTest_ES3Metal, TooManyBitsGeneratesFramebufferUnsupported)
                                    textures[i], 0);
         }
         EXPECT_GL_NO_ERROR();
-        EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
     }
 
     // Test maxDrawBuffers * RGBA32UI does not work.
@@ -3357,7 +3364,11 @@ TEST_P(FramebufferTestWithFormatFallback, R4G4B4A4_BaseRespecifyPreservesStagedM
     constexpr GLenum kInternalFormat = GL_RGBA4;
     constexpr GLenum kType           = GL_UNSIGNED_SHORT_4_4_4_4;
     constexpr GLsizei kSize          = 8;
-    const GLColor kColors[]          = {GLColor::red, GLColor::green, GLColor::blue};
+    const std::array<GLColor, 3> kColors = {
+        GLColor::red,
+        GLColor::green,
+        GLColor::blue,
+    };
 
     GLTexture texture;
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -3825,7 +3836,7 @@ TEST_P(FramebufferTest_ES31, IncompleteMissingAttachmentDefaultParam)
 
     glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, 1);
     glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, 1);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, 0);
     glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, 0);
@@ -4773,7 +4784,7 @@ TEST_P(FramebufferTest_ES31_MSAA, MultisampleStencilSampling)
 
     ANGLE_GL_PROGRAM(drawStencilProg, essl31_shaders::vs::Passthrough(), essl31_shaders::fs::Red());
 
-    const std::array<GLubyte, 4> stencilRefs = {64, 128, 192, 255};
+    constexpr std::array<GLubyte, 4> stencilRefs = {64, 128, 192, 255};
     for (int s = 0; s < kSamples; ++s)
     {
         glSampleMaski(0, 1 << s);
@@ -4789,7 +4800,7 @@ TEST_P(FramebufferTest_ES31_MSAA, MultisampleStencilSampling)
 
     // Populate Layer 0
     glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, msaaStencilArrayTex, 0, 0);
-    const std::array<GLubyte, 4> stencilRefs0 = {10, 20, 30, 40};
+    constexpr std::array<GLubyte, 4> stencilRefs0 = {10, 20, 30, 40};
     for (int s = 0; s < kSamples; ++s)
     {
         glSampleMaski(0, 1 << s);
@@ -4799,7 +4810,7 @@ TEST_P(FramebufferTest_ES31_MSAA, MultisampleStencilSampling)
 
     // Populate Layer 1
     glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, msaaStencilArrayTex, 0, 1);
-    const std::array<GLubyte, 4> stencilRefs1 = {50, 100, 150, 200};
+    constexpr std::array<GLubyte, 4> stencilRefs1 = {50, 100, 150, 200};
     for (int s = 0; s < kSamples; ++s)
     {
         glSampleMaski(0, 1 << s);
@@ -5736,7 +5747,7 @@ void main()
 
     glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
     glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     const float data[] = {
         1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f,
@@ -5753,7 +5764,7 @@ void main()
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, 0);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     validateSamplePass(query, defaultWidth, defaultHeight);
 
@@ -5771,7 +5782,7 @@ void main()
     const GLenum bufs[] = {GL_NONE, GL_NONE, GL_NONE, GL_COLOR_ATTACHMENT3};
 
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, mTexture, 0);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
     glDrawBuffers(4, bufs);
 
     validateSamplePass(query, width, height);
@@ -5779,7 +5790,7 @@ void main()
     // If fbo's attachment has been removed, the rendering size should be the same as framebuffer
     // default size.
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, 0, 0, 0);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
     validateSamplePass(query, defaultWidth, defaultHeight);
     ASSERT_GL_NO_ERROR();
@@ -5829,7 +5840,7 @@ void main()
         GLuint defaultHeight = 1 << loop;
         glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
         glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-        EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+        EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
 
         // Draw and check the FBO size
         validateSamplePass(query, defaultWidth, defaultHeight);
@@ -5849,7 +5860,7 @@ void main()
         GLuint defaultHeight = 1 << loop;
         glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
         glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-        EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+        EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
 
         // Draw and check the FBO size
         validateSamplePass(query, defaultWidth, defaultHeight);
@@ -5902,7 +5913,7 @@ void main()
         GLuint defaultHeight = 1 << loop;
         glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
         glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-        EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
         // Draw and check the FBO size
         validateSamplePass(query, defaultWidth, defaultHeight);
@@ -5922,7 +5933,7 @@ void main()
         GLuint defaultHeight = 1 << loop;
         glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
         glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-        EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
         // Draw and check the FBO size
         validateSamplePass(query, defaultWidth, defaultHeight);
@@ -5974,7 +5985,7 @@ void main()
     GLuint defaultHeight = 1;
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
     validateSamplePass(query, defaultWidth, defaultHeight);
 
     GLTexture mTexture;
@@ -5983,18 +5994,18 @@ void main()
     GLuint attachmentHeight = 2;
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, attachmentWidth, attachmentHeight);
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mTexture, 0);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
     validateSamplePass(query, attachmentWidth, attachmentWidth);
 
     defaultWidth  = 3;
     defaultHeight = 3;
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
     validateSamplePass(query, attachmentWidth, attachmentHeight);
 
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0, 0);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
     validateSamplePass(query, defaultWidth, defaultHeight);
 
     ASSERT_GL_NO_ERROR();
@@ -6008,22 +6019,22 @@ void main()
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebufferWithVariousSizeAndAttachmentShrink);
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
     validateSamplePass(query, defaultWidth, defaultHeight);
 
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mTexture, 0);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
     validateSamplePass(query, attachmentWidth, attachmentHeight);
 
     defaultWidth  = 1;
     defaultHeight = 1;
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, defaultWidth);
     glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, defaultHeight);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
     validateSamplePass(query, attachmentWidth, attachmentHeight);
 
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0, 0);
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_DRAW_FRAMEBUFFER);
     validateSamplePass(query, defaultWidth, defaultHeight);
 
     ASSERT_GL_NO_ERROR();
@@ -7778,7 +7789,7 @@ TEST_P(FramebufferTest_ES3, FramebufferChangeTest)
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthAttachment, 0);
 
-    EXPECT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    EXPECT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
     ASSERT_GL_NO_ERROR();
 
     // Depth only pass
@@ -10177,8 +10188,8 @@ TEST_P(FramebufferTest_ES3, DISABLED_MaxSize2DArrayNoOverflow)
     ASSERT_GL_NO_ERROR();
 }
 
-// Verify that recreating a texture's backing image due to use as storage image works when a
-// framebuffer is attached to multiple faces of the same cubemap.
+// Verify that potentially recreating a texture's backing image due to use as storage image works
+// when a framebuffer is attached to multiple faces of the same cubemap.
 TEST_P(FramebufferTest_ES31, AttachToMultipleCubeFacesThenBindAsStorageImage)
 {
     constexpr char kFS[] = R"(#version 310 es
@@ -10236,8 +10247,8 @@ void main()
     EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::red);
 }
 
-// Verify that recreating a texture's backing image due to srgb override works when a framebuffer is
-// attached to multiple faces of the same cubemap.
+// Verify that potentially recreating a texture's backing image due to srgb override works when a
+// framebuffer is attached to multiple faces of the same cubemap.
 TEST_P(FramebufferTest_ES31, AttachToMultipleCubeFacesThenSrgbOverride)
 {
     ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_texture_format_sRGB_override"));
@@ -10296,8 +10307,120 @@ void main()
     EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::red);
 }
 
-// Verify that recreating a texture's backing image due to MSRTT binding works when a framebuffer is
-// attached to multiple faces of the same cubemap.
+// Verify that potentially recreating a texture's backing image due to srgb override works when a
+// framebuffer is attached to multiple faces of the same cubemap.
+TEST_P(FramebufferTest_ES31, AttachToMultipleCubeFacesThenSrgbOverrideRGB10A2)
+{
+    ANGLE_SKIP_TEST_IF(!IsGLExtensionEnabled("GL_EXT_texture_format_sRGB_override"));
+
+    constexpr char kFS[] = R"(#version 310 es
+precision mediump float;
+layout(location = 0) out vec4 o0;
+layout(location = 1) out vec4 o1;
+void main()
+{
+    o0 = vec4(1.0, 0.0, 0.0, 1.0);
+    o1 = vec4(0.0, 1.0, 0.0, 1.0);
+})";
+    ANGLE_GL_PROGRAM(program, essl31_shaders::vs::Simple(), kFS);
+    glUseProgram(program);
+
+    // Create a cube map, and attach a framebuffer to two faces of it.
+    GLTexture cube;
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cube);
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGB10_A2, 6, 6);
+    ASSERT_GL_NO_ERROR();
+
+    GLFramebuffer fbo;
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+                           cube, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+                           cube, 0);
+    constexpr GLenum kDrawBufs[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, kDrawBufs);
+    ASSERT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
+    ASSERT_GL_NO_ERROR();
+
+    // Draw once to flush all dirty bits.
+    drawQuad(program, essl31_shaders::PositionAttrib(), 0.5f);
+
+    // Enable SRGB override on the texture, which should be ignored because RGB10_A2 does not have
+    // an sRGB equivalent.
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_SRGB);
+    ASSERT_GL_NO_ERROR();
+
+    // Change one of the attachments to dirty it, but not the other one.
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+                           cube, 0);
+
+    // Draw again.  If the backing image is recreated, both framebuffer attachments must be updated.
+    drawQuad(program, essl31_shaders::PositionAttrib(), 0.5f);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::red);
+    glReadBuffer(GL_COLOR_ATTACHMENT1);
+    EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::green);
+
+    // Verify the first draw was also done correctly
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+                           cube, 0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::red);
+}
+
+// Verify that potentially recreating a texture's backing image due to srgb override works when a
+// framebuffer is attached to a layer of a 2D array texture while another layer is being sampled
+// from.
+TEST_P(FramebufferTest_ES31, AttachAndSampleMultipleLayersThenSrgbOverride)
+{
+    ANGLE_SKIP_TEST_IF(!EnsureGLExtensionEnabled("GL_EXT_texture_format_sRGB_override"));
+
+    constexpr char kFS[] = R"(#version 300 es
+precision mediump float;
+// Sampled from layer 0, rendering is done to layer 1 so it's not a feedback loop.
+uniform mediump sampler2DArray s;
+out vec4 color;
+void main() { color = texture(s, vec3(0)); })";
+
+    ANGLE_GL_PROGRAM(program, essl3_shaders::vs::Simple(), kFS);
+
+    constexpr uint32_t kSize = 6;
+
+    // Use RGB10_A2, which should be ignored because RGB10_A2 does not have an sRGB equivalent.
+    // Regression test for an old behavior in the Vulkan backend where the backing image was
+    // recreated.
+    GLTexture color;
+    glBindTexture(GL_TEXTURE_2D_ARRAY, color);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGB10_A2, kSize, kSize, 2);
+    const std::vector<uint32_t> kInitColor(kSize * kSize, 0xC00000FFu);
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, kSize, kSize, 1, GL_RGBA,
+                    GL_UNSIGNED_INT_2_10_10_10_REV, kInitColor.data());
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    GLFramebuffer fbo;
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color, 0, 1);
+    ASSERT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
+
+    // Draw once to flush all dirty bits.
+    drawQuad(program, essl1_shaders::PositionAttrib(), 0.5f);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+
+    // Enable SRGB override on the texture
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_FORMAT_SRGB_OVERRIDE_EXT, GL_SRGB);
+    ASSERT_GL_NO_ERROR();
+
+    // Draw again, the backing image might be recreated.
+    drawQuad(program, essl1_shaders::PositionAttrib(), 0.5f);
+    EXPECT_PIXEL_COLOR_NEAR(0, 0, GLColor(127, 0, 0, 255), 1);
+    ASSERT_GL_NO_ERROR();
+}
+
+// Verify that potentially recreating a texture's backing image due to MSRTT binding works when a
+// framebuffer is attached to multiple faces of the same cubemap.
 TEST_P(FramebufferTest_ES31, AttachToMultipleCubeFacesThenMSRTT)
 {
     ANGLE_SKIP_TEST_IF(!EnsureGLExtensionEnabled("GL_EXT_multisampled_render_to_texture"));
@@ -10361,8 +10484,8 @@ void main()
     EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::red);
 }
 
-// Verify that recreating a texture's backing image due to changing its base level works when a
-// framebuffer is attached to multiple faces of the same cubemap.
+// Verify that potentially recreating a texture's backing image due to changing its base level works
+// when a framebuffer is attached to multiple faces of the same cubemap.
 TEST_P(FramebufferTest_ES31, AttachToMultipleCubeFacesThenChangeBaseLevel)
 {
     constexpr char kFS[] = R"(#version 310 es
@@ -10440,8 +10563,8 @@ void main()
     EXPECT_PIXEL_COLOR_EQ(0, 0, GLColor::red);
 }
 
-// Verify that recreating a texture's backing image due to enabling mipmapping works when a
-// framebuffer is attached to multiple faces of the same cubemap.
+// Verify that potentially recreating a texture's backing image due to enabling mipmapping works
+// when a framebuffer is attached to multiple faces of the same cubemap.
 TEST_P(FramebufferTest_ES31, AttachToMultipleCubeFacesThenEnableMipmapping)
 {
     constexpr char kFS[] = R"(#version 310 es
@@ -10586,7 +10709,7 @@ class FramebufferTest_ES3FBOReattachmentWorkaround : public ANGLETest<>
         }
 
         ASSERT_GL_NO_ERROR();
-        ASSERT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        ASSERT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
         // Clear color to green, depth to 1.0.
         glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
@@ -10627,7 +10750,7 @@ class FramebufferTest_ES3FBOReattachmentWorkaround : public ANGLETest<>
         }
 
         ASSERT_GL_NO_ERROR();
-        ASSERT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        ASSERT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
         // Clear color to green again, depth to 1.0.
         glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
@@ -10660,7 +10783,7 @@ class FramebufferTest_ES3FBOReattachmentWorkaround : public ANGLETest<>
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
 
         ASSERT_GL_NO_ERROR();
-        ASSERT_GLENUM_EQ(GL_FRAMEBUFFER_COMPLETE, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        ASSERT_GL_FRAMEBUFFER_COMPLETE(GL_FRAMEBUFFER);
 
         // Clear and draw.
         glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
@@ -10793,6 +10916,9 @@ ANGLE_INSTANTIATE_TEST_ES3_AND(
     ES3_OPENGLES().enable(Feature::ReattachFboDepthStencilOnReallocation),
     ES3_OPENGLES().disable(Feature::ReattachFboDepthStencilOnReallocation));
 
+// TODO(anglebug.com/558810273): No supported backends are available for this
+// test on iOS on arm64-based Macs.
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(FramebufferTest_ES31_MSAA);
 ANGLE_INSTANTIATE_TEST_ES31_AND(FramebufferTest_ES31_MSAA,
                                 ES31_VULKAN().enable(Feature::EmulatedPrerotation90),
                                 ES31_VULKAN().enable(Feature::EmulatedPrerotation180),

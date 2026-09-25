@@ -756,9 +756,9 @@ static GLfloat QuerySingleGLFloat(const FunctionsGL *functions, GLenum name)
 
 static GLfloat QueryGLFloatRange(const FunctionsGL *functions, GLenum name, size_t index)
 {
-    GLfloat result[2] = {};
-    functions->getFloatv(name, result);
-    return ANGLE_UNSAFE_TODO(result[index]);
+    std::array<GLfloat, 2> result = {};
+    functions->getFloatv(name, result.data());
+    return result[index];
 }
 
 static gl::TypePrecision QueryTypePrecision(const FunctionsGL *functions,
@@ -2136,6 +2136,11 @@ void GenerateCaps(const FunctionsGL *functions,
     {
         limitations->maxBufferBytes = 1 << 30;
     }
+
+    if (features.roundUp3dTextureSizeToPOTForLimit.enabled)
+    {
+        limitations->roundUp3DTextureSizeToPOTForLimit = true;
+    }
 }
 
 bool GetSystemInfoVendorIDAndDeviceID(const FunctionsGL *functions,
@@ -2350,6 +2355,8 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
     ANGLE_FEATURE_CONDITION(features, disableMSAASampleCount1, isHuaweiMaleoon);
     ANGLE_FEATURE_CONDITION(features, limitMax3dArrayTextureSizeTo1024,
                             isIntelLinuxLessThanKernelVersion5);
+    ANGLE_FEATURE_CONDITION(features, roundUp3dTextureSizeToPOTForLimit,
+                            isPowerVRDriver && powerVRVersion < (std::array<int, 2>{26, 2}));
 
     ANGLE_FEATURE_CONDITION(features, allowClearForRobustResourceInit, IsApple());
 
@@ -2369,7 +2376,7 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
     ANGLE_FEATURE_CONDITION(features, resetTexImage2DBaseLevel,
                             IsApple() && isIntel && GetMacOSVersion() >= OSVersion(10, 12, 4));
 
-    ANGLE_FEATURE_CONDITION(features, resetBaseLevelForASTCSubImage, IsPowerVR(vendor));
+    ANGLE_FEATURE_CONDITION(features, resetBaseLevelForASTCImage, IsPowerVR(vendor));
     ANGLE_FEATURE_CONDITION(features, recreateImmutableTextureOnBaseLevelIncrease,
                             IsPowerVR(vendor));
     ANGLE_FEATURE_CONDITION(features, resetTexStorage2DBaseLevel, IsPowerVR(vendor));
@@ -2380,7 +2387,8 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
                             IsPowerVR(vendor));
 
     ANGLE_FEATURE_CONDITION(features, adjustSrcDstRegionForBlitFramebuffer,
-                            IsLinux() || (IsAndroid() && isNvidia) || (IsWindows() && isNvidia) ||
+                            IsLinux() || (IsAndroid() && (isNvidia || isMali)) ||
+                                (IsWindows() && isNvidia) ||
                                 (IsApple() && functions->standard == STANDARD_GL_ES));
 
     ANGLE_FEATURE_CONDITION(features, clipSrcRegionForBlitFramebuffer,
@@ -2682,12 +2690,10 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
     ANGLE_FEATURE_CONDITION(features, dontInvalidateIncompleteFBOs,
                             !isMesa && isQualcomm && qualcommVersion < 881);
 
-    // glGenerateMipmap may silently fail on mesa, leaving mips that are expected to be recreated to
-    // match the base level in their original shape, hidden from ANGLE and its validation.
-    ANGLE_FEATURE_CONDITION(features, recreateMipmapLevelsBeforeGenerate, isMesa);
-
-    // http://crbug.com/498828605
-    ANGLE_FEATURE_CONDITION(features, expandFragmentOutputsToVec4, isAMD && isMesa);
+    // glGenerateMipmap may silently fail on mesa or mali. The failure mode is different on each
+    // driver, but in both cases ensuring that the full mip chain is explicitly defined prior to
+    // mipmap generation avoids the problem.
+    ANGLE_FEATURE_CONDITION(features, recreateMipmapLevelsBeforeGenerate, isMesa || isMali);
 
     // https://github.com/flutter/flutter/issues/47164
     // https://github.com/flutter/flutter/issues/47804
@@ -2722,8 +2728,7 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
     // Disable EXT_clear_texture entirely on IMG as a speculative fix for driver crashes.
     ANGLE_FEATURE_CONDITION(features, disableClearTexture, IsPowerVR(vendor));
 
-    // Forces a flush before generating a mipmap, which avoids a bad state in the IMG driver if
-    // the texture's base level is still bound to an active FBO.
+    // Forces a flush before generating a mipmap, which avoids bad states in the IMG driver.
     ANGLE_FEATURE_CONDITION(features, flushBeforeGenerateMipmap, IsPowerVR(vendor));
 
     // IMG GL drivers crash while compiling shaders with more than the limit of uniform blocks.
@@ -2746,7 +2751,7 @@ void InitializeFeatures(const FunctionsGL *functions, angle::FeaturesGL *feature
                             IsPowerVR(vendor) && IsAndroid());
 
     // crbug.com/553172761
-    ANGLE_FEATURE_CONDITION(features, useTexSubImageForHostTwiddledNpotUploads,
+    ANGLE_FEATURE_CONDITION(features, useTexSubImageForClientDataNpotUploads,
                             false /* IsPowerVR(vendor) */);
 
     // Mac Intel drivers are unable to allocate buffers larger than ~1gb

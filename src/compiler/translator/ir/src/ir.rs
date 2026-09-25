@@ -76,7 +76,7 @@ pub const TYPE_ID_MAT3X4: TypeId = TypeId { id: 24 };
 pub const TYPE_ID_MAT4X2: TypeId = TypeId { id: 25 };
 pub const TYPE_ID_MAT4X3: TypeId = TypeId { id: 26 };
 pub const TYPE_ID_MAT4: TypeId = TypeId { id: 27 };
-const MAX_PREDEFINED_TYPE_ID: u32 = TYPE_ID_MAT4.id;
+pub const MAX_PREDEFINED_TYPE_ID: u32 = TYPE_ID_MAT4.id;
 
 // Fixed enums for bool constants to avoid tracking whether they are defined or not, plus other
 // constants for convenience.
@@ -677,9 +677,9 @@ pub enum OpCode {
     // is true, that block jumps to the body of loop or the merge block otherwise.  For and
     // while loops can be distinguished by the presence of a "continue" block in Block.  The
     // body of the loop itself must terminate with `Continue` (if not otherwise terminated
-    // with `Break`, `Return` etc).  The continue block itself, if any, should also terminate
-    // with `Continue`, though that's immaterial (as there cannot be any other terminator).
-    //   Loop
+    // with `Break`, `Return`, `Discard`, etc).  The continue block itself, if any, should also
+    // terminate with `Continue`, though that's immaterial (as there cannot be any other
+    // terminator).   Loop
     Loop,
     // Similarly to `Loop`, marks the beginning of a do-loop.  Unlike `Loop`, the initial jump is
     // to the body of the do-while loop.  The body and condition blocks are similar to `Loop`.
@@ -1546,6 +1546,10 @@ pub struct Name {
     // should never really access this, and having Unicode in the mix will either cause trouble or
     // add binary size for no good reason.
     pub name: &'static str,
+    // A suffix used for generated shader interface names, for example extracted samplers.  Having
+    // this be separate allows `name` to continue to be a `&'static` string instead of one that's
+    // built.
+    pub suffix: Option<u32>,
     // Whether the name has any significance other than being debug info.  For example, it may be a
     // name that needs to be output exactly in text because the backend/driver looks for it.
     pub source: NameSource,
@@ -1556,17 +1560,20 @@ impl Name {
     // example, it's a temporary helper variable etc).  Duplicate names are allowed, and will be
     // made distinguishable if generating text.  Temp names are optional, and might as well be "".
     pub fn new_temp(name: &'static str) -> Name {
-        Name { name, source: NameSource::Temporary }
+        Name { name, suffix: None, source: NameSource::Temporary }
     }
     // A name that must be preserved in some predictable form in the output.  This is useful for
     // backends that reference this name directly, such as with OpenGL.
     pub fn new_interface(name: &'static str) -> Name {
-        Name { name, source: NameSource::ShaderInterface }
+        Name { name, suffix: None, source: NameSource::ShaderInterface }
     }
     // A name that must be preserved exactly in the output, for example `main`, or ANGLE internal
     // interface variables.
     pub fn new_exact(name: &'static str) -> Name {
-        Name { name, source: NameSource::Internal }
+        Name { name, suffix: None, source: NameSource::Internal }
+    }
+    pub fn new_exact_with_suffix(name: &'static str, suffix: u32) -> Name {
+        Name { name, suffix: Some(suffix), source: NameSource::Internal }
     }
 }
 
@@ -1585,6 +1592,7 @@ pub struct Variable {
     pub name: Name,
     pub type_id: TypeId,
     pub precision: Precision,
+    pub precise: bool,
     pub decorations: Decorations,
     pub built_in: Option<BuiltIn>,
     pub initializer: Option<ConstantId>,
@@ -1600,6 +1608,7 @@ impl Variable {
         name: Name,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
         built_in: Option<BuiltIn>,
         initializer: Option<ConstantId>,
@@ -1609,6 +1618,7 @@ impl Variable {
             name,
             type_id,
             precision,
+            precise,
             decorations,
             built_in,
             initializer,
@@ -1622,11 +1632,12 @@ impl Variable {
     // Const variables are only created during parse.  They are replaced by constants and never
     // referenced, and only serve the purpose of holding the assigned precision to the constant.
     // That precision affects the precision of operations they are involved in.
-    pub fn new_const(name: Name, type_id: TypeId, precision: Precision) -> Variable {
+    pub fn new_const(name: Name, type_id: TypeId, precision: Precision, precise: bool) -> Variable {
         Variable {
             name,
             type_id,
             precision,
+            precise,
             decorations: Decorations::new_none(),
             built_in: None,
             initializer: None,
@@ -1640,10 +1651,10 @@ impl Variable {
     pub fn is_built_in(&self) -> bool {
         self.built_in.is_some()
     }
+
     pub fn is_interface_variable(&self) -> bool {
-        let is_interface_variable = self.is_built_in() || !self.decorations.decorations.is_empty();
-        debug_assert!(!is_interface_variable || self.scope == VariableScope::Global);
-        is_interface_variable
+        self.scope == VariableScope::Global
+            && (self.is_built_in() || !self.decorations.decorations.is_empty())
     }
 }
 
@@ -1736,6 +1747,7 @@ pub struct Function {
     pub params: Vec<FunctionParam>,
     pub return_type_id: TypeId,
     pub return_precision: Precision,
+    pub return_precise: bool,
     pub return_decorations: Decorations,
 }
 
@@ -1745,6 +1757,7 @@ impl Function {
         params: Vec<FunctionParam>,
         return_type_id: TypeId,
         return_precision: Precision,
+        return_precise: bool,
         return_decorations: Decorations,
     ) -> Function {
         Function {
@@ -1753,6 +1766,7 @@ impl Function {
             params,
             return_type_id,
             return_precision,
+            return_precise,
             return_decorations,
         }
     }
@@ -1889,7 +1903,6 @@ pub enum EmulatedMultiDraw {
 pub enum Decoration {
     // Corresponding to GLSL qualifiers with the same name
     Invariant,
-    Precise,
     Smooth,
     Flat,
     NoPerspective,
@@ -1966,12 +1979,6 @@ impl Decorations {
             self.decorations.push(Decoration::Invariant);
         }
     }
-    pub fn add_precise(&mut self) {
-        if !self.has(Decoration::Precise) {
-            self.decorations.push(Decoration::Precise);
-        }
-    }
-
     pub fn has(&self, query: Decoration) -> bool {
         self.decorations.contains(&query)
     }
@@ -2071,6 +2078,7 @@ pub struct Field {
     pub name: Name,
     pub type_id: TypeId,
     pub precision: Precision,
+    pub precise: bool,
     pub decorations: Decorations,
     // Reflection info.  Tracking is only needed for fields of nameless interface blocks.
     pub is_static_use: bool,
@@ -2081,9 +2089,10 @@ impl Field {
         name: Name,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
     ) -> Field {
-        Field { name, type_id, precision, decorations, is_static_use: false }
+        Field { name, type_id, precision, precise, decorations, is_static_use: false }
     }
 }
 
@@ -2492,6 +2501,19 @@ impl AdvancedBlendEquations {
     }
 }
 
+#[cfg_attr(debug_assertions, derive(Debug))]
+pub struct FieldsUsedWithTexelFetch {
+    // If subfields is empty, this variable/field is itself a sampler that is statically used with
+    // `texelFetch`.  Otherwise, the subfields are used with `texelFetch`.
+    pub subfields: HashMap<u32, FieldsUsedWithTexelFetch>,
+}
+
+impl FieldsUsedWithTexelFetch {
+    fn new() -> FieldsUsedWithTexelFetch {
+        FieldsUsedWithTexelFetch { subfields: HashMap::new() }
+    }
+}
+
 // The entire IR.  At a high level, the IR is:
 //
 // - A set of types
@@ -2580,6 +2602,7 @@ pub struct IRMeta {
     // Shader reflection info
     reflection_info: reflection::Info,
     uses_secondary_frag_data: bool,
+    samplers_used_with_texel_fetch: HashMap<VariableId, FieldsUsedWithTexelFetch>,
 }
 
 impl IRMeta {
@@ -2726,6 +2749,7 @@ impl IRMeta {
             variables_pending_zero_initialization: HashSet::new(),
             reflection_info: reflection::Info::new(),
             uses_secondary_frag_data: false,
+            samplers_used_with_texel_fetch: HashMap::new(),
         }
     }
 
@@ -3253,6 +3277,7 @@ impl IRMeta {
         name: Name,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
         decorations: Decorations,
         built_in: Option<BuiltIn>,
         initializer: Option<ConstantId>,
@@ -3266,8 +3291,16 @@ impl IRMeta {
         } else {
             self.get_pointer_type_id(type_id)
         };
-        let var =
-            Variable::new(name, type_id, precision, decorations, built_in, initializer, scope);
+        let var = Variable::new(
+            name,
+            type_id,
+            precision,
+            precise,
+            decorations,
+            built_in,
+            initializer,
+            scope,
+        );
         let variable_id = self.add_variable(var);
 
         if scope == VariableScope::Global {
@@ -3283,11 +3316,12 @@ impl IRMeta {
         name: Name,
         type_id: TypeId,
         precision: Precision,
+        precise: bool,
     ) -> VariableId {
         // Automatically turn the type into a pointer
         debug_assert!(!self.get_type(type_id).is_pointer());
         let type_id = self.get_pointer_type_id(type_id);
-        let var = Variable::new_const(name, type_id, precision);
+        let var = Variable::new_const(name, type_id, precision, precise);
         // No need to add the variable to any scope, because they are always replaced by their
         // constant value in the IR.
         self.add_variable(var)
@@ -3305,6 +3339,7 @@ impl IRMeta {
             name,
             type_id,
             precision,
+            false,
             Decorations::new_none(),
             None,
             initializer,
@@ -3327,6 +3362,7 @@ impl IRMeta {
             Name::new_exact(""),
             type_id,
             precision,
+            false,
             Decorations::new_none(),
             Some(built_in),
             None,
@@ -3359,18 +3395,20 @@ impl IRMeta {
     // variable is replaced with the global variable and a new id is assigned to the interface
     // variable and returned.  This way, the shader does not need to be modified except for
     // possibly writing to the cache variable at the start of shader and reading from it at the
-    // end.
+    // end.  If requested, the original variable's type is overridden with a given type.
     pub fn declare_cached_global_for_variable(
         &mut self,
         variable_id: VariableId,
         cache_name: &'static str,
+        original_variable_type_override: Option<TypeId>,
     ) -> (VariableId, TypedId) {
         let variable = self.get_variable_mut(variable_id);
 
         // Replace the variable with a private global.
         let original_name = std::mem::replace(&mut variable.name, Name::new_temp(cache_name));
-        let type_id = variable.type_id;
+        let type_id = original_variable_type_override.unwrap_or(variable.type_id);
         let precision = variable.precision;
+        let precise = variable.precise;
         let original_decorations =
             std::mem::replace(&mut variable.decorations, Decorations::new_none());
         let original_built_in = std::mem::take(&mut variable.built_in);
@@ -3385,6 +3423,7 @@ impl IRMeta {
             original_name,
             type_id,
             precision,
+            precise,
             original_decorations,
             original_built_in,
             None,
@@ -3537,6 +3576,18 @@ impl IRMeta {
         type_info.get_element_type_id().unwrap()
     }
 
+    // Given an array type, retrieves its base element.
+    pub fn get_base_element_type(&self, type_id: TypeId) -> TypeId {
+        debug_assert!(!self.get_type(type_id).is_pointer());
+
+        let mut type_id = type_id;
+        while let Type::Array(element_id, _) = self.get_type(type_id) {
+            type_id = *element_id;
+        }
+
+        type_id
+    }
+
     // For some transformations, it matters if some built-in is statically used, even if it's
     // dead-code eliminated.  Calculate that before DCE.
     pub fn cache_built_in_static_use_before_dce(&mut self) {
@@ -3545,6 +3596,16 @@ impl IRMeta {
     }
     pub fn uses_secondary_frag_data(&self) -> bool {
         self.uses_secondary_frag_data
+    }
+
+    pub fn mark_texel_fetch_use(&mut self, variable_id: VariableId, fields: &[u32]) {
+        let mut subfields = self
+            .samplers_used_with_texel_fetch
+            .entry(variable_id)
+            .or_insert(FieldsUsedWithTexelFetch::new());
+        for &field in fields {
+            subfields = subfields.subfields.entry(field).or_insert(FieldsUsedWithTexelFetch::new());
+        }
     }
 
     pub fn take_reflection_info(&mut self) -> reflection::Info {
@@ -3607,8 +3668,12 @@ impl IR {
         options: &reflection::Options,
         active_interface_variables: &HashSet<VariableId>,
     ) {
-        self.meta.reflection_info =
-            reflection::collect_info(self, options, active_interface_variables);
+        self.meta.reflection_info = reflection::collect_info(
+            self,
+            options,
+            active_interface_variables,
+            &self.meta.samplers_used_with_texel_fetch,
+        );
     }
 }
 

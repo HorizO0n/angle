@@ -68,7 +68,7 @@ cl_ulong CLDeviceVk::getSingleFpConfig() const
 cl_ulong CLDeviceVk::getHalfFpConfig() const
 {
     cl_ulong halfFpConfig = 0;
-    if (mRenderer->getFeatures().supportsShaderFloat16.enabled)
+    if (mRenderer->getFeatures().supportsClFp16.enabled)
     {
         halfFpConfig |= CL_FP_INF_NAN;
         if (mRenderer->getFeatures().supportsRoundingModeRteFp16.enabled)
@@ -93,7 +93,7 @@ cl_ulong CLDeviceVk::getHalfFpConfig() const
 cl_ulong CLDeviceVk::getDoubleFpConfig() const
 {
     cl_ulong doubleFpConfig = 0;
-    if (mRenderer->getFeatures().supportsShaderFloat64.enabled)
+    if (mRenderer->getFeatures().supportsClFp64.enabled)
     {
         doubleFpConfig |=
             CL_FP_INF_NAN | CL_FP_ROUND_TO_NEAREST | CL_FP_ROUND_TO_ZERO | CL_FP_DENORM;
@@ -341,20 +341,29 @@ CLDeviceVk::CLDeviceVk(const cl::Device &device, vk::Renderer *renderer)
         {cl::DeviceInfo::MaxSamplers, 16u},
         {cl::DeviceInfo::MaxConstantArgs, 8},
         {cl::DeviceInfo::MinDataTypeAlignSize, 128},
-        {cl::DeviceInfo::NativeVectorWidthChar, 4},
-        {cl::DeviceInfo::NativeVectorWidthShort, 2},
+
+        // TODO: vulkan currently does not have a way to query vector widths. we can just
+        // emulate/return "1" for now, but come back to this if that changes
+        // https://anglebug.com/561370394
+        {cl::DeviceInfo::NativeVectorWidthChar, 1},
+        {cl::DeviceInfo::NativeVectorWidthShort, 1},
         {cl::DeviceInfo::NativeVectorWidthInt, 1},
         {cl::DeviceInfo::NativeVectorWidthLong, 1},
         {cl::DeviceInfo::NativeVectorWidthFloat, 1},
-        {cl::DeviceInfo::NativeVectorWidthDouble, mRenderer->getNativeVectorWidthDouble()},
-        {cl::DeviceInfo::NativeVectorWidthHalf, mRenderer->getNativeVectorWidthHalf()},
-        {cl::DeviceInfo::PreferredVectorWidthChar, 4},
-        {cl::DeviceInfo::PreferredVectorWidthShort, 8},
+        {cl::DeviceInfo::NativeVectorWidthDouble,
+         mRenderer->getFeatures().supportsClFp64.enabled ? 1 : 0},
+        {cl::DeviceInfo::NativeVectorWidthHalf,
+         mRenderer->getFeatures().supportsClFp16.enabled ? 1 : 0},
+        {cl::DeviceInfo::PreferredVectorWidthChar, 1},
+        {cl::DeviceInfo::PreferredVectorWidthShort, 1},
         {cl::DeviceInfo::PreferredVectorWidthInt, 1},
         {cl::DeviceInfo::PreferredVectorWidthLong, 1},
         {cl::DeviceInfo::PreferredVectorWidthFloat, 1},
-        {cl::DeviceInfo::PreferredVectorWidthDouble, mRenderer->getPreferredVectorWidthDouble()},
-        {cl::DeviceInfo::PreferredVectorWidthHalf, mRenderer->getPreferredVectorWidthHalf()},
+        {cl::DeviceInfo::PreferredVectorWidthDouble,
+         mRenderer->getFeatures().supportsClFp64.enabled ? 1 : 0},
+        {cl::DeviceInfo::PreferredVectorWidthHalf,
+         mRenderer->getFeatures().supportsClFp16.enabled ? 1 : 0},
+
         {cl::DeviceInfo::PreferredLocalAtomicAlignment, 0},
         {cl::DeviceInfo::PreferredGlobalAtomicAlignment, 0},
         {cl::DeviceInfo::PreferredPlatformAtomicAlignment, 0},
@@ -455,13 +464,14 @@ CLDeviceImpl::Info CLDeviceVk::createInfo(cl::DeviceType type) const
                                                              .name    = "cl_arm_import_memory"});
         }
     }
-    if (mRenderer->getFeatures().supportsShaderFloat16.enabled)
+    // Check for fp16 and fp64 support.
+    if (mRenderer->getFeatures().supportsClFp16.enabled)
     {
         versionedExtensionList.push_back(
             cl_name_version{.version = CL_MAKE_VERSION(1, 0, 0), .name = "cl_khr_fp16"});
     }
-    //if (mRenderer->getFeatures().supportsShaderFloat64.enabled)
-    //{
+    if (mRenderer->getFeatures().supportsClFp64.enabled)
+    {
         versionedExtensionList.push_back(
             cl_name_version{.version = CL_MAKE_VERSION(1, 0, 0), .name = "cl_khr_fp64"});
     //}

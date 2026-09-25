@@ -3959,7 +3959,17 @@ angle::Result DynamicDescriptorPool::getOrAllocateDescriptorSet(
     ASSERT(context->getFeatures().descriptorSetCache.enabled);
     bool success;
 
-    // First scan the descriptorSet cache.
+    // If desc matches the most recently resolved entry, reuse it directly without hashing
+    // desc or probing mDescriptorSetCache.
+    if (!mLRUList.empty() && mLRUList.front().sharedCacheKey->getDesc() == desc)
+    {
+        *descriptorSetOut = mLRUList.front().descriptorSet;
+        ASSERT(!(*newSharedCacheKeyOut));
+        mCacheStats.hit();
+        return angle::Result::Continue;
+    }
+
+    // Scan the descriptorSet cache.
     DescriptorSetLRUListIterator listIterator;
     if (mDescriptorSetCache.getDescriptorSet(desc, &listIterator))
     {
@@ -5975,9 +5985,9 @@ angle::Result ImageHelper::initExternal(ErrorContext *context,
     {
         imageCreateInfoPNext = compressionControl;
         ASSERT(GetImageFormatListCreateInfo(imageCreateInfoPNext) == nullptr);
-        imageCreateInfoPNext = DeriveCreateInfoPNext(context, actualFormatID, imageCreateInfoPNext,
-                                                     &imageFormatListInfoStorage, &imageFormats,
-                                                     formatReinterpretability, &mCreateFlags);
+        imageCreateInfoPNext = DeriveCreateInfoPNext(
+            context, intendedFormatID, actualFormatID, imageCreateInfoPNext,
+            &imageFormatListInfoStorage, &imageFormats, formatReinterpretability, &mCreateFlags);
     }
     else
     {
@@ -6100,6 +6110,7 @@ angle::Result ImageHelper::initExternal(ErrorContext *context,
 // static
 const void *ImageHelper::DeriveCreateInfoPNext(
     ErrorContext *context,
+    angle::FormatID intendedFormatID,
     angle::FormatID actualFormatID,
     const void *pNext,
     VkImageFormatListCreateInfoKHR *imageFormatListInfoStorage,
@@ -6124,15 +6135,15 @@ const void *ImageHelper::DeriveCreateInfoPNext(
 
     // With the introduction of sRGB related GLES extensions any sample/render target could be
     // respecified causing it to be interpreted in a different colorspace.
-    Renderer *renderer                = context->getRenderer();
-    const angle::Format &actualFormat = angle::Format::Get(actualFormatID);
-    angle::FormatID additionalFormatID =
-        actualFormat.isSRGB ? ConvertToLinear(actualFormatID) : ConvertToSRGB(actualFormatID);
-
-    // Allow linear and sRGB variants if image format list is supported and format features match
-    if (renderer->getFeatures().supportsImageFormatList.enabled &&
-        renderer->haveSameFormatFeatureBits(actualFormatID, additionalFormatID))
+    // Allow linear and sRGB variants if the _intended_ format requires it.  sRGB override should be
+    // ignored even if the fallback format supports it.
+    if (IsOverridableLinearOrSRGBFormat(intendedFormatID))
     {
+        Renderer *renderer                = context->getRenderer();
+        const angle::Format &actualFormat = angle::Format::Get(actualFormatID);
+        angle::FormatID additionalFormatID =
+            actualFormat.isSRGB ? ConvertToLinear(actualFormatID) : ConvertToSRGB(actualFormatID);
+
         // Add the VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT to VkImage create flag
         *createFlagsOut |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
 
@@ -7930,11 +7941,18 @@ void ImageHelper::updateLayoutAndBarrier(Context *context,
             // If we are transition into shaderRead layout, remember the last non-shaderRead layout
             // here.
             const bool isCurrentAccessShaderReadOnly = IsShaderReadOnlyAccess(mCurrentAccess);
-            if (isNewAccessShaderReadOnly && !isCurrentAccessShaderReadOnly)
+            if (isNewAccessShaderReadOnly)
             {
-                mLastNonShaderReadOnlyEvent.release(context);
-                mLastNonShaderReadOnlyAccess = mCurrentAccess;
-                mCurrentShaderReadStageMask  = dstStageMask;
+                if (!isCurrentAccessShaderReadOnly)
+                {
+                    mLastNonShaderReadOnlyEvent.release(context);
+                    mLastNonShaderReadOnlyAccess = mCurrentAccess;
+                    mCurrentShaderReadStageMask  = dstStageMask;
+                }
+                else
+                {
+                    mCurrentShaderReadStageMask |= dstStageMask;
+                }
             }
 
             if (barrierType == BarrierType::Event)
@@ -8266,7 +8284,7 @@ angle::Result ImageHelper::CopyImageSubData(const gl::Context *context,
         // images.  A compute shader is used in such a case to perform the copy.
         UtilsVk &utilsVk = contextVk->getUtils();
 
-        UtilsVk::CopyImageBitsParameters params;
+        UtilsVk::CopyImageBitsParameters params = {};
         params.srcOffset[0]   = srcX;
         params.srcOffset[1]   = srcY;
         params.srcOffset[2]   = srcZ.get();
@@ -8299,8 +8317,9 @@ angle::Result ImageHelper::generateMipmapsWithBlit(ContextVk *contextVk,
 
     CommandResources resources;
     gl::OwnerLevel baseLevelGL = toGLLevel(baseLevel);
-    resources.onImageTransferWrite(baseLevelGL + 1, maxLevel.get(), gl::OwnerLayer(0), mLayerCount,
-                                   VK_IMAGE_ASPECT_COLOR_BIT, this);
+    resources.onImageTransferWrite(baseLevelGL + 1,
+                                   std::min(mLevelCount - 1, maxLevel.get()) - baseLevel.get(),
+                                   gl::OwnerLayer(0), mLayerCount, VK_IMAGE_ASPECT_COLOR_BIT, this);
 
     OutsideRenderPassCommandBuffer *commandBuffer;
     ANGLE_TRY(contextVk->getOutsideRenderPassCommandBuffer(resources, &commandBuffer));
@@ -8425,11 +8444,9 @@ angle::Result ImageHelper::generateMipmapsWithBlit(ContextVk *contextVk,
     }
     else
     {
-        // Make sure the following commands know a transfer operation has happened since the last
-        // barrier, and what subresource it has affected.
+        // onImageTransferWrite already declares that the image is being written to.  Set the access
+        // to TransferSrcDst for correct future synchronization.
         setCurrentImageAccess(renderer, ImageAccess::TransferSrcDst);
-        onWrite(baseLevelGL + 1, mLevelCount - 1, gl::OwnerLayer(0), mLayerCount,
-                VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
     contextVk->trackImageWithOutsideRenderPassEvent(this);
@@ -8486,7 +8503,7 @@ void ImageHelper::removeSingleSubresourceStagedUpdates(ContextVk *contextVk,
     for (size_t index = 0; index < levelUpdates->size();)
     {
         auto update = levelUpdates->begin() + index;
-        if (update->matchesLayerRange(layerIndex, layerCount, mLayerCount))
+        if (matchesLayerRange(*update, layerIndex, layerCount))
         {
             // Update total staging buffer size
             mTotalStagedBufferUpdateSize -= update->updateSource == UpdateSource::Buffer
@@ -8500,7 +8517,7 @@ void ImageHelper::removeSingleSubresourceStagedUpdates(ContextVk *contextVk,
             // The layer range should either match the update, or not intersect with it.  If this
             // assertion fails, the update should be pertially removed, but is retained which is
             // incorrect.
-            ASSERT(!update->intersectsLayerRange(layerIndex, layerCount, mLayerCount));
+            ASSERT(!intersectsLayerRange(*update, layerIndex, layerCount));
             index++;
         }
     }
@@ -9385,6 +9402,18 @@ void ImageHelper::onWrite(gl::OwnerLevel levelStart,
                           uint32_t layerCount,
                           VkImageAspectFlags aspectFlags)
 {
+    const LevelIndex levelStartVk = toVkLevel(levelStart);
+    ASSERT((levelStartVk + levelCount).get() <= mLevelCount);
+    // As a special case, the caller might get kMaxContentDefinedLayerCount as layer and a layer
+    // count of 0.
+    const bool isInDepthRange =
+        mImageType == VK_IMAGE_TYPE_3D &&
+        (layerStart + layerCount).get() <= std::max(mExtents.depth >> levelStartVk.get(), 1u);
+    const bool isInLayerRange =
+        mImageType != VK_IMAGE_TYPE_3D && (layerStart + layerCount).get() <= mLayerCount;
+    ASSERT((layerStart == gl::OwnerLayer(kMaxContentDefinedLayerCount) && layerCount == 0) ||
+           isInDepthRange || isInLayerRange);
+
     mCurrentSingleClearValue.reset();
 
     // Mark contents of the given subresource as defined.
@@ -10334,12 +10363,12 @@ angle::Result ImageHelper::flushSingleSubresourceStagedUpdates(ContextVk *contex
         {
             SubresourceUpdate &update = (*levelUpdates)[updateIndex];
 
-            if (update.intersectsLayerRange(layer, layerCount, mLayerCount))
+            if (intersectsLayerRange(update, layer, layerCount))
             {
                 // On any data update or the clear does not match exact layer range, we'll need to
                 // do a full upload.
                 const bool isClear = IsClearOfAllChannels(update.updateSource);
-                if (isClear && update.matchesLayerRange(layer, layerCount, mLayerCount))
+                if (isClear && matchesLayerRange(update, layer, layerCount))
                 {
                     foundClear = updateIndex;
                 }
@@ -10408,7 +10437,7 @@ angle::Result ImageHelper::flushStagedClearEmulatedChannelsUpdates(ContextVk *co
         ASSERT(update->updateSource == UpdateSource::ClearEmulatedChannelsOnly);
         gl::OwnerLayer updateBaseLayer;
         uint32_t updateLayerCount;
-        update->getDestSubresource(mLayerCount, &updateBaseLayer, &updateLayerCount);
+        getDestSubresource(*update, &updateBaseLayer, &updateLayerCount);
 
         const LevelIndex updateMipLevelVk = toVkLevel(updateMipLevelGL);
         update->data.clear.levelIndex     = updateMipLevelGL.get();
@@ -10515,7 +10544,7 @@ angle::Result ImageHelper::flushStagedUpdatesImpl(ContextVk *contextVk,
 
             gl::OwnerLayer updateBaseLayer;
             uint32_t updateLayerCount;
-            update.getDestSubresource(mLayerCount, &updateBaseLayer, &updateLayerCount);
+            getDestSubresource(update, &updateBaseLayer, &updateLayerCount);
 
             // If the update layers don't intersect the requested layers, skip the update.
             const bool areUpdateLayersOutsideRange =
@@ -10871,7 +10900,7 @@ bool ImageHelper::hasStagedUpdatesForSubresource(gl::OwnerLevel levelGL,
     {
         gl::OwnerLayer updateBaseLayer;
         uint32_t updateLayerCount;
-        update.getDestSubresource(mLayerCount, &updateBaseLayer, &updateLayerCount);
+        getDestSubresource(update, &updateBaseLayer, &updateLayerCount);
 
         const gl::OwnerLayer updateLayerEnd = updateBaseLayer + updateLayerCount;
         const gl::OwnerLayer layerEnd       = layer + layerCount;
@@ -10923,7 +10952,7 @@ void ImageHelper::adjustLayerRange(const SubresourceUpdates &levelUpdates,
     {
         gl::OwnerLayer updateBaseLayer;
         uint32_t updateLayerCount;
-        update.getDestSubresource(mLayerCount, &updateBaseLayer, &updateLayerCount);
+        getDestSubresource(update, &updateBaseLayer, &updateLayerCount);
         const gl::OwnerLayer updateLayerEnd = updateBaseLayer + updateLayerCount;
 
         // In some cases, the update has the bigger layer range than the request. If the update
@@ -11127,7 +11156,7 @@ void ImageHelper::pruneSupersededUpdatesForLevelImpl(ContextVk *contextVk,
 
         gl::OwnerLayer layerIndex;
         uint32_t layerCount = 0;
-        update.getDestSubresource(mLayerCount, &layerIndex, &layerCount);
+        getDestSubresource(update, &layerIndex, &layerCount);
 
         gl::Box currentUpdateBox(gl::kOffsetZero, gl::Extents());
         if (update.updateSource == UpdateSource::Buffer)
@@ -12264,59 +12293,60 @@ void ImageHelper::SubresourceUpdate::release(Renderer *renderer)
     }
 }
 
-bool ImageHelper::SubresourceUpdate::matchesLayerRange(gl::OwnerLayer layerIndex,
-                                                       uint32_t layerCount,
-                                                       uint32_t imageLayerCount) const
+bool ImageHelper::matchesLayerRange(const SubresourceUpdate &update,
+                                    gl::OwnerLayer layerIndex,
+                                    uint32_t layerCount) const
 {
     ASSERT(layerCount != VK_REMAINING_ARRAY_LAYERS);
     gl::OwnerLayer updateBaseLayer;
     uint32_t updateLayerCount;
-    getDestSubresource(imageLayerCount, &updateBaseLayer, &updateLayerCount);
+    getDestSubresource(update, &updateBaseLayer, &updateLayerCount);
 
     return updateBaseLayer == layerIndex && updateLayerCount == layerCount;
 }
 
-bool ImageHelper::SubresourceUpdate::intersectsLayerRange(gl::OwnerLayer layerIndex,
-                                                          uint32_t layerCount,
-                                                          uint32_t imageLayerCount) const
+bool ImageHelper::intersectsLayerRange(const SubresourceUpdate &update,
+                                       gl::OwnerLayer layerIndex,
+                                       uint32_t layerCount) const
 {
     gl::OwnerLayer updateBaseLayer;
     uint32_t updateLayerCount;
-    getDestSubresource(imageLayerCount, &updateBaseLayer, &updateLayerCount);
+    getDestSubresource(update, &updateBaseLayer, &updateLayerCount);
     const gl::OwnerLayer updateLayerEnd = updateBaseLayer + updateLayerCount;
 
     return updateBaseLayer < (layerIndex + layerCount) && updateLayerEnd > layerIndex;
 }
 
-void ImageHelper::SubresourceUpdate::getDestSubresource(uint32_t imageLayerCount,
-                                                        gl::OwnerLayer *baseLayerOut,
-                                                        uint32_t *layerCountOut) const
+void ImageHelper::getDestSubresource(const SubresourceUpdate &update,
+                                     gl::OwnerLayer *baseLayerOut,
+                                     uint32_t *layerCountOut) const
 {
-    if (IsClear(updateSource))
+    if (IsClear(update.updateSource))
     {
-        *baseLayerOut  = gl::OwnerLayer(data.clear.layerIndex);
-        *layerCountOut = data.clear.layerCount;
+        *baseLayerOut  = gl::OwnerLayer(update.data.clear.layerIndex);
+        *layerCountOut = update.data.clear.layerCount;
 
         if (*layerCountOut == static_cast<uint32_t>(gl::ImageIndex::kEntireLevel))
         {
-            *layerCountOut = imageLayerCount;
+            *layerCountOut = mLayerCount;
         }
     }
-    else if (updateSource == UpdateSource::ClearPartial)
+    else if (update.updateSource == UpdateSource::ClearPartial)
     {
-        *baseLayerOut  = gl::OwnerLayer(data.clearPartial.layerIndex);
-        *layerCountOut = data.clearPartial.layerCount;
+        *baseLayerOut  = gl::OwnerLayer(update.data.clearPartial.layerIndex);
+        *layerCountOut = update.data.clearPartial.layerCount;
 
         if (*layerCountOut == static_cast<uint32_t>(gl::ImageIndex::kEntireLevel))
         {
-            *layerCountOut = imageLayerCount;
+            *layerCountOut = mLayerCount;
         }
     }
     else
     {
         const VkImageSubresourceLayers &dstSubresource =
-            updateSource == UpdateSource::Buffer ? data.buffer.copyRegion.imageSubresource
-                                                 : data.image.copyRegion.dstSubresource;
+            update.updateSource == UpdateSource::Buffer
+                ? update.data.buffer.copyRegion.imageSubresource
+                : update.data.image.copyRegion.dstSubresource;
         *baseLayerOut  = gl::OwnerLayer(dstSubresource.baseArrayLayer);
         *layerCountOut = dstSubresource.layerCount;
 

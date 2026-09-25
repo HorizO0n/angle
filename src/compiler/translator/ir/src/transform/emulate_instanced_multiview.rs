@@ -68,6 +68,7 @@ fn replace_view_id(state: &mut State, options: &Options) -> TypedId {
                 view_id_name,
                 TYPE_ID_UINT,
                 Precision::High,
+                false,
                 Decorations::new(vec![decoration]),
                 None,
                 None,
@@ -83,7 +84,10 @@ fn replace_instance_id(state: &mut State) -> (TypedId, TypedId) {
 
     // Make a duplicate of gl_InstanceID to add to globals, and let the shader use the replacement.
     (
-        state.ir_meta.declare_cached_global_for_variable(replaced_instance_id, "InstanceID").1,
+        state
+            .ir_meta
+            .declare_cached_global_for_variable(replaced_instance_id, "InstanceID", None)
+            .1,
         replaced_instance_id_typed,
     )
 }
@@ -151,6 +155,7 @@ fn generate_preamble(
                 Name::new_exact("multiviewBaseViewLayerIndex"),
                 TYPE_ID_INT,
                 Precision::High,
+                false,
                 Decorations::new(vec![Decoration::Uniform]),
                 None,
                 None,

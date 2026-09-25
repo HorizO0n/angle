@@ -424,14 +424,16 @@ void GetObjectLabelBase(const std::string &objectLabel,
     }
 }
 
-GLsizei GetMarkerLength(GLsizei length, const char *marker)
+GLsizei GetMarkerLength(GLsizei length, const char *marker, GLsizei maxLength)
 {
     if (length == 0)
     {
-        return static_cast<GLsizei>(
+        length = static_cast<GLsizei>(
             std::min<size_t>(strlen(marker), std::numeric_limits<GLsizei>::max()));
     }
-    return length;
+    // https://crbug.com/524435922: Cap debug marker length to prevent driver or validation layer
+    // issues with large labels.
+    return std::min(length, maxLength);
 }
 
 enum SubjectIndexes : angle::SubjectIndex
@@ -3225,7 +3227,9 @@ void Context::insertEventMarker(GLsizei length, const char *marker)
     }
 
     // If <length> is 0 then <marker> is assumed to be null-terminated.
-    ANGLE_CONTEXT_TRY(mImplementation->insertEventMarker(GetMarkerLength(length, marker), marker));
+    ANGLE_CONTEXT_TRY(mImplementation->insertEventMarker(
+        GetMarkerLength(length, marker, static_cast<GLsizei>(getCaps().maxDebugMessageLength)),
+        marker));
 }
 
 void Context::pushGroupMarker(GLsizei length, const char *marker)
@@ -3244,8 +3248,9 @@ void Context::pushGroupMarker(GLsizei length, const char *marker)
     else
     {
         // If <length> is 0 then <marker> is assumed to be null-terminated.
-        ANGLE_CONTEXT_TRY(
-            mImplementation->pushGroupMarker(GetMarkerLength(length, marker), marker));
+        ANGLE_CONTEXT_TRY(mImplementation->pushGroupMarker(
+            GetMarkerLength(length, marker, static_cast<GLsizei>(getCaps().maxDebugMessageLength)),
+            marker));
     }
     mState.incrementGroupMarkers();
 }
@@ -3328,11 +3333,6 @@ void Context::handleError(GLenum errorCode,
                           unsigned int line)
 {
     mErrors.handleError(errorCode, message, file, function, line);
-
-    if (isHardenedContext() && getFrontendFeatures().loseHardenedContextOnBackendError.enabled)
-    {
-        markContextLost(GraphicsResetStatus::UnknownContextReset);
-    }
 }
 
 // Get one of the recorded errors and clear its flag, if any.
@@ -9075,6 +9075,11 @@ void Context::getSemaphoreParameterui64v(SemaphoreID semaphore, GLenum pname, GL
     UNIMPLEMENTED();
 }
 
+void Context::trimMemory(MemoryTrimLevel trimLevel)
+{
+    UNIMPLEMENTED();
+}
+
 void Context::acquireTextures(GLuint numTextures,
                               const TextureID *textureIds,
                               const GLenum *layouts)
@@ -9702,17 +9707,23 @@ egl::Error Context::setDefaultFramebuffer(egl::Surface *drawSurface, egl::Surfac
     mCurrentDrawSurface = drawSurface;
     mCurrentReadSurface = readSurface;
 
+    egl::Error result = egl::NoError();
     if (drawSurface != nullptr)
     {
-        ANGLE_TRY(drawSurface->makeCurrent(this));
+        result = drawSurface->makeCurrent(this);
     }
-
-    ANGLE_TRY(mDefaultFramebuffer->setSurfaces(this, drawSurface, readSurface));
-
-    if (readSurface && (drawSurface != readSurface))
+    if (drawSurface != readSurface)
     {
-        ANGLE_TRY(readSurface->makeCurrent(this));
+        ASSERT(readSurface != nullptr);
+        egl::Error readResult = readSurface->makeCurrent(this);
+        if (!result.isError())
+        {
+            result = readResult;
+        }
     }
+    ANGLE_TRY(result);
+
+    mDefaultFramebuffer->setSurfaces(this, drawSurface, readSurface);
 
     // Update default framebuffer, the binding of the previous default
     // framebuffer (or lack of) will have a nullptr.
@@ -9749,7 +9760,7 @@ egl::Error Context::unsetDefaultFramebuffer()
             mDrawFramebufferObserverBinding.bind(nullptr);
         }
 
-        ANGLE_TRY(defaultFramebuffer->unsetSurfaces(this));
+        defaultFramebuffer->unsetSurfaces(this);
         mState.mFramebufferManager->setDefaultFramebuffer(nullptr);
     }
 
@@ -9764,6 +9775,7 @@ egl::Error Context::unsetDefaultFramebuffer()
     }
     if (drawSurface != readSurface)
     {
+        ASSERT(readSurface != nullptr);
         ANGLE_TRY(readSurface->unMakeCurrent(this));
     }
 
@@ -10370,6 +10382,8 @@ ErrorSet::ErrorSet(Debug *debug,
     : mDebug(debug),
       mResetStrategy(GetResetStrategy(attribs)),
       mLoseContextOnOutOfMemory(frontendFeatures.loseContextOnOutOfMemory.enabled),
+      mLoseContextOnInternalError(frontendFeatures.loseHardenedContextOnBackendError.enabled &&
+                                  (GetWebGLContext(attribs) || GetHardenedContext(attribs))),
       mContextLostForced(false),
       mResetStatus(GraphicsResetStatus::NoError),
       mErrorMessageCount(0),
@@ -10397,8 +10411,9 @@ void ErrorSet::handleError(GLenum errorCode,
                            const char *function,
                            unsigned int line)
 {
-    if (errorCode == GL_OUT_OF_MEMORY && mResetStrategy == GL_LOSE_CONTEXT_ON_RESET_EXT &&
-        mLoseContextOnOutOfMemory)
+    if (mLoseContextOnInternalError ||
+        (errorCode == GL_OUT_OF_MEMORY && mResetStrategy == GL_LOSE_CONTEXT_ON_RESET_EXT &&
+         mLoseContextOnOutOfMemory))
     {
         markContextLost(GraphicsResetStatus::UnknownContextReset);
     }
