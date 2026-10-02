@@ -16,11 +16,9 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
-#include <cstddef>
-#include <cstdio>
 #include <utility>
 #include <vector>
+#include "common/unsafe_buffers.h"
 
 #include "common/debug.h"
 #include "common/mathutil.h"
@@ -118,14 +116,14 @@ class Matrix
     {
         ASSERT(rowIndex < mRows);
         ASSERT(columnIndex < mCols);
-        return mElements[rowIndex * columns() + columnIndex];
+        return mElements.at(rowIndex * columns() + columnIndex);
     }
 
     T &operator()(const unsigned int rowIndex, const unsigned int columnIndex)
     {
         ASSERT(rowIndex < mRows);
         ASSERT(columnIndex < mCols);
-        return mElements[rowIndex * columns() + columnIndex];
+        return mElements.at(rowIndex * columns() + columnIndex);
     }
 
     const T &at(const unsigned int rowIndex, const unsigned int columnIndex) const
@@ -135,7 +133,7 @@ class Matrix
         return operator()(rowIndex, columnIndex);
     }
 
-    Matrix<T> operator*(const Matrix<T> &m) const
+    Matrix<T> operator*(const Matrix<T> &m)
     {
         ASSERT(columns() == m.rows());
 
@@ -146,7 +144,7 @@ class Matrix
         {
             for (unsigned int j = 0; j < resultCols; j++)
             {
-                T tmp = T(0);
+                T tmp = 0.0f;
                 for (unsigned int k = 0; k < columns(); k++)
                     tmp += at(i, k) * m(k, j);
                 result(i, j) = tmp;
@@ -167,20 +165,22 @@ class Matrix
     {
         ASSERT(columns() == m.columns());
         ASSERT(rows() == m.rows());
-        return mElements == m.mElements;
+        return elements() == m.elements();
     }
 
-    bool operator!=(const Matrix<T> &m) const { return !(*this == m); }
+    bool operator!=(const Matrix<T> &m) const { return !(elements() == m.elements()); }
 
     bool nearlyEqual(T epsilon, const Matrix<T> &m) const
     {
         ASSERT(columns() == m.columns());
         ASSERT(rows() == m.rows());
-        const size_t count = mElements.size();
-        for (size_t i = 0; i < count; i++)
+        const auto &otherElts = m.elements();
+        auto it               = otherElts.begin();
+        for (const auto &elt : mElements)
         {
-            if (std::abs(mElements[i] - m.mElements[i]) > epsilon)
+            if ((elt - *it > epsilon) && (*it - elt > epsilon))
                 return false;
+            ++it;
         }
         return true;
     }
@@ -251,54 +251,58 @@ class Matrix
 
             case 4:
             {
-                const T minorMatrices[4][3 * 3] = {{
-                                                       at(1, 1),
-                                                       at(2, 1),
-                                                       at(3, 1),
-                                                       at(1, 2),
-                                                       at(2, 2),
-                                                       at(3, 2),
-                                                       at(1, 3),
-                                                       at(2, 3),
-                                                       at(3, 3),
-                                                   },
-                                                   {
-                                                       at(1, 0),
-                                                       at(2, 0),
-                                                       at(3, 0),
-                                                       at(1, 2),
-                                                       at(2, 2),
-                                                       at(3, 2),
-                                                       at(1, 3),
-                                                       at(2, 3),
-                                                       at(3, 3),
-                                                   },
-                                                   {
-                                                       at(1, 0),
-                                                       at(2, 0),
-                                                       at(3, 0),
-                                                       at(1, 1),
-                                                       at(2, 1),
-                                                       at(3, 1),
-                                                       at(1, 3),
-                                                       at(2, 3),
-                                                       at(3, 3),
-                                                   },
-                                                   {
-                                                       at(1, 0),
-                                                       at(2, 0),
-                                                       at(3, 0),
-                                                       at(1, 1),
-                                                       at(2, 1),
-                                                       at(3, 1),
-                                                       at(1, 2),
-                                                       at(2, 2),
-                                                       at(3, 2),
-                                                   }};
-                return at(0, 0) * Matrix<T>(minorMatrices[0], 3).determinant() -
-                       at(0, 1) * Matrix<T>(minorMatrices[1], 3).determinant() +
-                       at(0, 2) * Matrix<T>(minorMatrices[2], 3).determinant() -
-                       at(0, 3) * Matrix<T>(minorMatrices[3], 3).determinant();
+                const float minorMatrices[4][3 * 3] = {{
+                                                           at(1, 1),
+                                                           at(2, 1),
+                                                           at(3, 1),
+                                                           at(1, 2),
+                                                           at(2, 2),
+                                                           at(3, 2),
+                                                           at(1, 3),
+                                                           at(2, 3),
+                                                           at(3, 3),
+                                                       },
+                                                       {
+                                                           at(1, 0),
+                                                           at(2, 0),
+                                                           at(3, 0),
+                                                           at(1, 2),
+                                                           at(2, 2),
+                                                           at(3, 2),
+                                                           at(1, 3),
+                                                           at(2, 3),
+                                                           at(3, 3),
+                                                       },
+                                                       {
+                                                           at(1, 0),
+                                                           at(2, 0),
+                                                           at(3, 0),
+                                                           at(1, 1),
+                                                           at(2, 1),
+                                                           at(3, 1),
+                                                           at(1, 3),
+                                                           at(2, 3),
+                                                           at(3, 3),
+                                                       },
+                                                       {
+                                                           at(1, 0),
+                                                           at(2, 0),
+                                                           at(3, 0),
+                                                           at(1, 1),
+                                                           at(2, 1),
+                                                           at(3, 1),
+                                                           at(1, 2),
+                                                           at(2, 2),
+                                                           at(3, 2),
+                                                       }};
+                return at(0, 0) *
+                           Matrix<T>(ANGLE_UNSAFE_TODO(minorMatrices[0]), 3).determinant() -
+                       at(0, 1) *
+                           Matrix<T>(ANGLE_UNSAFE_TODO(minorMatrices[1]), 3).determinant() +
+                       at(0, 2) *
+                           Matrix<T>(ANGLE_UNSAFE_TODO(minorMatrices[2]), 3).determinant() -
+                       at(0, 3) *
+                           Matrix<T>(ANGLE_UNSAFE_TODO(minorMatrices[3]), 3).determinant();
             }
 
             default:
@@ -368,7 +372,7 @@ class Matrix
         for (unsigned int i = 0; i < rows(); ++i)
         {
             const auto pos = i * columns() + (i % columns());
-            mElements[pos] = one;
+            mElements.at(pos) = one;
         }
     }
 
@@ -387,7 +391,7 @@ class Matrix
         for (unsigned int i = 0; i < cols; ++i)
         {
             const auto pos = i * cols + (i % cols);
-            matrix[pos]    = one;
+            ANGLE_UNSAFE_TODO(matrix[pos]) = one;
         }
     }
 
@@ -401,36 +405,33 @@ class Matrix
 class Mat4
 {
   public:
-    Mat4()
-        : Mat4(1.f, 0.f, 0.f, 0.f,
-               0.f, 1.f, 0.f, 0.f,
-               0.f, 0.f, 1.f, 0.f,
-               0.f, 0.f, 0.f, 1.f)
-    {}
+    Mat4() : Mat4(1.f, 0.f, 0.f, 0.f,
+                  0.f, 1.f, 0.f, 0.f,
+                  0.f, 0.f, 1.f, 0.f,
+                  0.f, 0.f, 0.f, 1.f) {}
 
-    explicit Mat4(const Matrix<float> &generalMatrix) : Mat4()
+    Mat4(const Matrix<float> generalMatrix)
     {
-        const unsigned int minCols = std::min(4u, generalMatrix.columns());
-        const unsigned int minRows = std::min(4u, generalMatrix.rows());
+        unsigned int minCols = std::min((unsigned int)4, generalMatrix.columns());
+        unsigned int minRows = std::min((unsigned int)4, generalMatrix.rows());
         for (unsigned int i = 0; i < minCols; i++)
         {
             for (unsigned int j = 0; j < minRows; j++)
             {
-                mElements[i * 4 + j] = generalMatrix.at(j, i);
+                mElements.at(j * minCols + i) = generalMatrix.at(j, i);
             }
         }
     }
 
-    explicit Mat4(const std::vector<float> &elements) : mElements{}
+    Mat4(const std::vector<float> &elements)
     {
-        const size_t count = std::min(elements.size(), mElements.size());
-        std::copy_n(elements.begin(), count, mElements.data());
+        std::copy(elements.begin(), std::min(elements.end(), elements.begin() + std::size(mElements)),
+                  mElements.data());
     }
 
-    explicit Mat4(angle::Span<const float> elements) : mElements{}
+    Mat4(const float *elements)
     {
-        const size_t count = std::min(elements.size(), mElements.size());
-        std::copy_n(elements.begin(), count, mElements.data());
+        std::copy(elements, ANGLE_UNSAFE_TODO(elements + std::size(mElements)), mElements.data());
     }
 
     Mat4(float m00, float m01, float m02, float m03,
@@ -563,47 +564,54 @@ class Mat4
                     -rpl / rml, -tpb / tmb, -fpn / fmn, 1.f);
     }
 
-    Mat4 product(const Mat4 &m) const
+    // Optimized matrix multiplication – manually unrolled with __restrict hints
+    Mat4 product(const Mat4 &m)
     {
-        const std::array<float, 16> &a = mElements;
-        const std::array<float, 16> &b = m.mElements;
+        const float *__restrict a = mElements.data();
+        const float *__restrict b = m.mElements.data();
+        // We assume 'this' and 'm' do not alias; if they do, result is still correct but may
+        // violate strict aliasing.
         return Mat4(
-            a[0] * b[0] + a[4] * b[1] + a[8] * b[2] + a[12] * b[3],
-            a[1] * b[0] + a[5] * b[1] + a[9] * b[2] + a[13] * b[3],
-            a[2] * b[0] + a[6] * b[1] + a[10] * b[2] + a[14] * b[3],
-            a[3] * b[0] + a[7] * b[1] + a[11] * b[2] + a[15] * b[3],
+            ANGLE_UNSAFE_TODO(a[0] * b[0] + a[4] * b[1] + a[8] * b[2] + a[12] * b[3]),
+            ANGLE_UNSAFE_TODO(a[1] * b[0] + a[5] * b[1] + a[9] * b[2] + a[13] * b[3]),
+            ANGLE_UNSAFE_TODO(a[2] * b[0] + a[6] * b[1] + a[10] * b[2] + a[14] * b[3]),
+            ANGLE_UNSAFE_TODO(a[3] * b[0] + a[7] * b[1] + a[11] * b[2] + a[15] * b[3]),
 
-            a[0] * b[4] + a[4] * b[5] + a[8] * b[6] + a[12] * b[7],
-            a[1] * b[4] + a[5] * b[5] + a[9] * b[6] + a[13] * b[7],
-            a[2] * b[4] + a[6] * b[5] + a[10] * b[6] + a[14] * b[7],
-            a[3] * b[4] + a[7] * b[5] + a[11] * b[6] + a[15] * b[7],
+            ANGLE_UNSAFE_TODO(a[0] * b[4] + a[4] * b[5] + a[8] * b[6] + a[12] * b[7]),
+            ANGLE_UNSAFE_TODO(a[1] * b[4] + a[5] * b[5] + a[9] * b[6] + a[13] * b[7]),
+            ANGLE_UNSAFE_TODO(a[2] * b[4] + a[6] * b[5] + a[10] * b[6] + a[14] * b[7]),
+            ANGLE_UNSAFE_TODO(a[3] * b[4] + a[7] * b[5] + a[11] * b[6] + a[15] * b[7]),
 
-            a[0] * b[8] + a[4] * b[9] + a[8] * b[10] + a[12] * b[11],
-            a[1] * b[8] + a[5] * b[9] + a[9] * b[10] + a[13] * b[11],
-            a[2] * b[8] + a[6] * b[9] + a[10] * b[10] + a[14] * b[11],
-            a[3] * b[8] + a[7] * b[9] + a[11] * b[10] + a[15] * b[11],
+            ANGLE_UNSAFE_TODO(a[0] * b[8] + a[4] * b[9] + a[8] * b[10] + a[12] * b[11]),
+            ANGLE_UNSAFE_TODO(a[1] * b[8] + a[5] * b[9] + a[9] * b[10] + a[13] * b[11]),
+            ANGLE_UNSAFE_TODO(a[2] * b[8] + a[6] * b[9] + a[10] * b[10] + a[14] * b[11]),
+            ANGLE_UNSAFE_TODO(a[3] * b[8] + a[7] * b[9] + a[11] * b[10] + a[15] * b[11]),
 
-            a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15],
-            a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15],
-            a[2] * b[12] + a[6] * b[13] + a[10] * b[14] + a[14] * b[15],
-            a[3] * b[12] + a[7] * b[13] + a[11] * b[14] + a[15] * b[15]);
+            ANGLE_UNSAFE_TODO(a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15]),
+            ANGLE_UNSAFE_TODO(a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15]),
+            ANGLE_UNSAFE_TODO(a[2] * b[12] + a[6] * b[13] + a[10] * b[14] + a[14] * b[15]),
+            ANGLE_UNSAFE_TODO(a[3] * b[12] + a[7] * b[13] + a[11] * b[14] + a[15] * b[15]));
     }
 
-    Vector4 product(const Vector4 &b) const
+    Vector4 product(const Vector4 &b)
     {
         return Vector4(
-            mElements[0] * b.x() + mElements[4] * b.y() + mElements[8]  * b.z() + mElements[12] * b.w(),
-            mElements[1] * b.x() + mElements[5] * b.y() + mElements[9]  * b.z() + mElements[13] * b.w(),
-            mElements[2] * b.x() + mElements[6] * b.y() + mElements[10] * b.z() + mElements[14] * b.w(),
-            mElements[3] * b.x() + mElements[7] * b.y() + mElements[11] * b.z() + mElements[15] * b.w());
+            ANGLE_UNSAFE_TODO(mElements[0] * b.x() + mElements[4] * b.y() + mElements[8] * b.z() +
+                              mElements[12] * b.w()),
+            ANGLE_UNSAFE_TODO(mElements[1] * b.x() + mElements[5] * b.y() + mElements[9] * b.z() +
+                              mElements[13] * b.w()),
+            ANGLE_UNSAFE_TODO(mElements[2] * b.x() + mElements[6] * b.y() + mElements[10] * b.z() +
+                              mElements[14] * b.w()),
+            ANGLE_UNSAFE_TODO(mElements[3] * b.x() + mElements[7] * b.y() + mElements[11] * b.z() +
+                              mElements[15] * b.w()));
     }
 
-    void dump() const
+    void dump()
     {
-        std::printf("[ %f %f %f %f ]\n", mElements[0], mElements[4], mElements[8],  mElements[12]);
-        std::printf("[ %f %f %f %f ]\n", mElements[1], mElements[5], mElements[9],  mElements[13]);
-        std::printf("[ %f %f %f %f ]\n", mElements[2], mElements[6], mElements[10], mElements[14]);
-        std::printf("[ %f %f %f %f ]\n", mElements[3], mElements[7], mElements[11], mElements[15]);
+        printf("[ %f %f %f %f ]\n", mElements[0], mElements[4], mElements[8], mElements[12]);
+        printf("[ %f %f %f %f ]\n", mElements[1], mElements[5], mElements[9], mElements[13]);
+        printf("[ %f %f %f %f ]\n", mElements[2], mElements[6], mElements[10], mElements[14]);
+        printf("[ %f %f %f %f ]\n", mElements[3], mElements[7], mElements[11], mElements[15]);
     }
 
     float *data() { return mElements.data(); }
@@ -613,14 +621,14 @@ class Mat4
     {
         ASSERT(rowIndex < 4);
         ASSERT(columnIndex < 4);
-        return mElements[rowIndex * 4 + columnIndex];
+        return ANGLE_UNSAFE_TODO(mElements[rowIndex * 4 + columnIndex]);
     }
 
     float &operator()(const unsigned int rowIndex, const unsigned int columnIndex)
     {
         ASSERT(rowIndex < 4);
         ASSERT(columnIndex < 4);
-        return mElements[rowIndex * 4 + columnIndex];
+        return ANGLE_UNSAFE_TODO(mElements[rowIndex * 4 + columnIndex]);
     }
 
     float at(const unsigned int rowIndex, const unsigned int columnIndex) const
@@ -630,14 +638,17 @@ class Mat4
         return operator()(rowIndex, columnIndex);
     }
 
-    bool operator==(const Mat4 &m) const { return mElements == m.mElements; }
+    bool operator==(const Mat4 &m) const { return mElements == m.elements(); }
 
     bool nearlyEqual(float epsilon, const Mat4 &m) const
     {
-        for (size_t i = 0; i < mElements.size(); i++)
+        const auto &otherElts = m.elements();
+        auto it               = otherElts.begin();
+        for (const auto &elt : mElements)
         {
-            if (std::abs(mElements[i] - m.mElements[i]) > epsilon)
+            if ((elt - *it > epsilon) && (*it - elt > epsilon))
                 return false;
+            ++it;
         }
         return true;
     }
@@ -653,20 +664,24 @@ class Mat4
         return result;
     }
 
+    // Optimized inverse: use inverse of determinant once, then multiply instead of divide
     Mat4 inverse() const
     {
         Mat4 coft;
         CofactorTransposed(*this, coft);
 
         // Determinant via first row dot cofactor row 0
-        const float det = at(0, 0) * coft(0, 0) + at(0, 1) * coft(1, 0) +
-                          at(0, 2) * coft(2, 0) + at(0, 3) * coft(3, 0);
+        float det = at(0, 0) * coft(0, 0) + at(0, 1) * coft(1, 0) +
+                    at(0, 2) * coft(2, 0) + at(0, 3) * coft(3, 0);
 
         const float invDet = 1.0f / det;
         Mat4 result;
-        for (size_t i = 0; i < result.mElements.size(); ++i)
+        for (unsigned int i = 0; i < 4; ++i)
         {
-            result.mElements[i] = coft.mElements[i] * invDet;
+            for (unsigned int j = 0; j < 4; ++j)
+            {
+                result(i, j) = coft(i, j) * invDet;
+            }
         }
         return result;
     }
