@@ -39,7 +39,7 @@ use_lto = true
 
 angle_build_tests = false
 
-cflags_c = [
+angle_extra_cflags_c = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -70,7 +70,7 @@ cflags_c = [
   "-D_ALLBSD_SOURCE"
 ]
 
-cflags_cc = [
+angle_extra_cflags_cc = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -101,7 +101,7 @@ cflags_cc = [
   "-D_ALLBSD_SOURCE"
 ]
 
-ldflags = [
+angle_extra_ldflags = [
   "-fuse-ld=lld",
   "-Wl,--gc-sections",
   "-flto",

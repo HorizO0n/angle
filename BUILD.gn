@@ -97,6 +97,11 @@ declare_args() {
   install_prefix = ""
 
   angle_use_crypto_hasher = build_with_chromium
+
+  angle_extra_cflags = []
+  angle_extra_cflags_c = []
+  angle_extra_cflags_cc = []
+  angle_extra_ldflags = []
 }
 
 declare_args() {
@@ -324,6 +329,19 @@ config("internal_config") {
   }
   if (angle_use_crypto_hasher) {
     defines += [ "ANGLE_USE_CRYPTO_HASHER=1" ]
+  }
+
+  if (angle_extra_cflags != []) {
+    cflags += angle_extra_cflags
+  }
+  if (angle_extra_cflags_c != []) {
+    cflags_c += angle_extra_cflags_c
+  }
+  if (angle_extra_cflags_cc != []) {
+    cflags_cc += angle_extra_cflags_cc
+  }
+  if (angle_extra_ldflags != []) {
+    ldflags += angle_extra_ldflags
   }
 }
 
