@@ -14,10 +14,13 @@
 #ifndef COMMON_MATRIX_UTILS_H_
 #define COMMON_MATRIX_UTILS_H_
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdio>
 #include <utility>
 #include <vector>
-#include "common/unsafe_buffers.h"
 
 #include "common/debug.h"
 #include "common/mathutil.h"
@@ -132,7 +135,7 @@ class Matrix
         return operator()(rowIndex, columnIndex);
     }
 
-    Matrix<T> operator*(const Matrix<T> &m)
+    Matrix<T> operator*(const Matrix<T> &m) const
     {
         ASSERT(columns() == m.rows());
 
@@ -143,7 +146,7 @@ class Matrix
         {
             for (unsigned int j = 0; j < resultCols; j++)
             {
-                T tmp = 0.0f;
+                T tmp = T(0);
                 for (unsigned int k = 0; k < columns(); k++)
                     tmp += at(i, k) * m(k, j);
                 result(i, j) = tmp;
@@ -156,29 +159,27 @@ class Matrix
     void operator*=(const Matrix<T> &m)
     {
         ASSERT(columns() == m.rows());
-        Matrix<T> res  = (*this) * m;
-        size_t numElts = res.elements().size();
-        mElements.resize(numElts);
-        memcpy(mElements.data(), res.data(), numElts * sizeof(float));
+        Matrix<T> res = (*this) * m;
+        mElements.assign(res.mElements.begin(), res.mElements.end());
     }
 
     bool operator==(const Matrix<T> &m) const
     {
         ASSERT(columns() == m.columns());
         ASSERT(rows() == m.rows());
-        return elements() == m.elements();
+        return mElements == m.mElements;
     }
 
-    bool operator!=(const Matrix<T> &m) const { return !(elements() == m.elements()); }
+    bool operator!=(const Matrix<T> &m) const { return !(*this == m); }
 
     bool nearlyEqual(T epsilon, const Matrix<T> &m) const
     {
         ASSERT(columns() == m.columns());
         ASSERT(rows() == m.rows());
-        const auto &otherElts = m.elements();
-        for (size_t i = 0; i < otherElts.size(); i++)
+        const size_t count = mElements.size();
+        for (size_t i = 0; i < count; i++)
         {
-            if ((mElements[i] - otherElts[i] > epsilon) && (otherElts[i] - mElements[i] > epsilon))
+            if (std::abs(mElements[i] - m.mElements[i]) > epsilon)
                 return false;
         }
         return true;
@@ -250,50 +251,50 @@ class Matrix
 
             case 4:
             {
-                const float minorMatrices[4][3 * 3] = {{
-                                                           at(1, 1),
-                                                           at(2, 1),
-                                                           at(3, 1),
-                                                           at(1, 2),
-                                                           at(2, 2),
-                                                           at(3, 2),
-                                                           at(1, 3),
-                                                           at(2, 3),
-                                                           at(3, 3),
-                                                       },
-                                                       {
-                                                           at(1, 0),
-                                                           at(2, 0),
-                                                           at(3, 0),
-                                                           at(1, 2),
-                                                           at(2, 2),
-                                                           at(3, 2),
-                                                           at(1, 3),
-                                                           at(2, 3),
-                                                           at(3, 3),
-                                                       },
-                                                       {
-                                                           at(1, 0),
-                                                           at(2, 0),
-                                                           at(3, 0),
-                                                           at(1, 1),
-                                                           at(2, 1),
-                                                           at(3, 1),
-                                                           at(1, 3),
-                                                           at(2, 3),
-                                                           at(3, 3),
-                                                       },
-                                                       {
-                                                           at(1, 0),
-                                                           at(2, 0),
-                                                           at(3, 0),
-                                                           at(1, 1),
-                                                           at(2, 1),
-                                                           at(3, 1),
-                                                           at(1, 2),
-                                                           at(2, 2),
-                                                           at(3, 2),
-                                                       }};
+                const T minorMatrices[4][3 * 3] = {{
+                                                       at(1, 1),
+                                                       at(2, 1),
+                                                       at(3, 1),
+                                                       at(1, 2),
+                                                       at(2, 2),
+                                                       at(3, 2),
+                                                       at(1, 3),
+                                                       at(2, 3),
+                                                       at(3, 3),
+                                                   },
+                                                   {
+                                                       at(1, 0),
+                                                       at(2, 0),
+                                                       at(3, 0),
+                                                       at(1, 2),
+                                                       at(2, 2),
+                                                       at(3, 2),
+                                                       at(1, 3),
+                                                       at(2, 3),
+                                                       at(3, 3),
+                                                   },
+                                                   {
+                                                       at(1, 0),
+                                                       at(2, 0),
+                                                       at(3, 0),
+                                                       at(1, 1),
+                                                       at(2, 1),
+                                                       at(3, 1),
+                                                       at(1, 3),
+                                                       at(2, 3),
+                                                       at(3, 3),
+                                                   },
+                                                   {
+                                                       at(1, 0),
+                                                       at(2, 0),
+                                                       at(3, 0),
+                                                       at(1, 1),
+                                                       at(2, 1),
+                                                       at(3, 1),
+                                                       at(1, 2),
+                                                       at(2, 2),
+                                                       at(3, 2),
+                                                   }};
                 return at(0, 0) * Matrix<T>(minorMatrices[0], 3).determinant() -
                        at(0, 1) * Matrix<T>(minorMatrices[1], 3).determinant() +
                        at(0, 2) * Matrix<T>(minorMatrices[2], 3).determinant() -
@@ -400,33 +401,36 @@ class Matrix
 class Mat4
 {
   public:
-    Mat4() : Mat4(1.f, 0.f, 0.f, 0.f,
-                  0.f, 1.f, 0.f, 0.f,
-                  0.f, 0.f, 1.f, 0.f,
-                  0.f, 0.f, 0.f, 1.f) {}
+    Mat4()
+        : Mat4(1.f, 0.f, 0.f, 0.f,
+               0.f, 1.f, 0.f, 0.f,
+               0.f, 0.f, 1.f, 0.f,
+               0.f, 0.f, 0.f, 1.f)
+    {}
 
-    Mat4(const Matrix<float> generalMatrix)
+    explicit Mat4(const Matrix<float> &generalMatrix) : Mat4()
     {
-        unsigned int minCols = std::min((unsigned int)4, generalMatrix.columns());
-        unsigned int minRows = std::min((unsigned int)4, generalMatrix.rows());
+        const unsigned int minCols = std::min(4u, generalMatrix.columns());
+        const unsigned int minRows = std::min(4u, generalMatrix.rows());
         for (unsigned int i = 0; i < minCols; i++)
         {
             for (unsigned int j = 0; j < minRows; j++)
             {
-                mElements[j * minCols + i] = generalMatrix.at(j, i);
+                mElements[i * 4 + j] = generalMatrix.at(j, i);
             }
         }
     }
 
-    Mat4(const std::vector<float> &elements)
+    explicit Mat4(const std::vector<float> &elements) : mElements{}
     {
-        std::copy(elements.begin(), std::min(elements.end(), elements.begin() + std::size(mElements)),
-                  mElements.data());
+        const size_t count = std::min(elements.size(), mElements.size());
+        std::copy_n(elements.begin(), count, mElements.data());
     }
 
-    Mat4(const float *elements)
+    explicit Mat4(angle::Span<const float> elements) : mElements{}
     {
-        std::copy(elements, ANGLE_UNSAFE_TODO(elements + std::size(mElements)), mElements.data());
+        const size_t count = std::min(elements.size(), mElements.size());
+        std::copy_n(elements.begin(), count, mElements.data());
     }
 
     Mat4(float m00, float m01, float m02, float m03,
@@ -559,51 +563,47 @@ class Mat4
                     -rpl / rml, -tpb / tmb, -fpn / fmn, 1.f);
     }
 
-    // Optimized matrix multiplication – manually unrolled with __restrict hints
-    Mat4 product(const Mat4 &m)
+    Mat4 product(const Mat4 &m) const
     {
-        const float * __restrict a = mElements.data();
-        const float * __restrict b = m.mElements.data();
-        // We assume 'this' and 'm' do not alias; if they do, result is still correct but may violate strict aliasing.
+        const std::array<float, 16> &a = mElements;
+        const std::array<float, 16> &b = m.mElements;
         return Mat4(
-            a[0]*b[0] + a[4]*b[1] + a[8]*b[2] + a[12]*b[3],
-            a[1]*b[0] + a[5]*b[1] + a[9]*b[2] + a[13]*b[3],
-            a[2]*b[0] + a[6]*b[1] + a[10]*b[2] + a[14]*b[3],
-            a[3]*b[0] + a[7]*b[1] + a[11]*b[2] + a[15]*b[3],
+            a[0] * b[0] + a[4] * b[1] + a[8] * b[2] + a[12] * b[3],
+            a[1] * b[0] + a[5] * b[1] + a[9] * b[2] + a[13] * b[3],
+            a[2] * b[0] + a[6] * b[1] + a[10] * b[2] + a[14] * b[3],
+            a[3] * b[0] + a[7] * b[1] + a[11] * b[2] + a[15] * b[3],
 
-            a[0]*b[4] + a[4]*b[5] + a[8]*b[6] + a[12]*b[7],
-            a[1]*b[4] + a[5]*b[5] + a[9]*b[6] + a[13]*b[7],
-            a[2]*b[4] + a[6]*b[5] + a[10]*b[6] + a[14]*b[7],
-            a[3]*b[4] + a[7]*b[5] + a[11]*b[6] + a[15]*b[7],
+            a[0] * b[4] + a[4] * b[5] + a[8] * b[6] + a[12] * b[7],
+            a[1] * b[4] + a[5] * b[5] + a[9] * b[6] + a[13] * b[7],
+            a[2] * b[4] + a[6] * b[5] + a[10] * b[6] + a[14] * b[7],
+            a[3] * b[4] + a[7] * b[5] + a[11] * b[6] + a[15] * b[7],
 
-            a[0]*b[8] + a[4]*b[9] + a[8]*b[10] + a[12]*b[11],
-            a[1]*b[8] + a[5]*b[9] + a[9]*b[10] + a[13]*b[11],
-            a[2]*b[8] + a[6]*b[9] + a[10]*b[10] + a[14]*b[11],
-            a[3]*b[8] + a[7]*b[9] + a[11]*b[10] + a[15]*b[11],
+            a[0] * b[8] + a[4] * b[9] + a[8] * b[10] + a[12] * b[11],
+            a[1] * b[8] + a[5] * b[9] + a[9] * b[10] + a[13] * b[11],
+            a[2] * b[8] + a[6] * b[9] + a[10] * b[10] + a[14] * b[11],
+            a[3] * b[8] + a[7] * b[9] + a[11] * b[10] + a[15] * b[11],
 
-            a[0]*b[12] + a[4]*b[13] + a[8]*b[14] + a[12]*b[15],
-            a[1]*b[12] + a[5]*b[13] + a[9]*b[14] + a[13]*b[15],
-            a[2]*b[12] + a[6]*b[13] + a[10]*b[14] + a[14]*b[15],
-            a[3]*b[12] + a[7]*b[13] + a[11]*b[14] + a[15]*b[15]
-        );
+            a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15],
+            a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15],
+            a[2] * b[12] + a[6] * b[13] + a[10] * b[14] + a[14] * b[15],
+            a[3] * b[12] + a[7] * b[13] + a[11] * b[14] + a[15] * b[15]);
     }
 
-    Vector4 product(const Vector4 &b)
+    Vector4 product(const Vector4 &b) const
     {
         return Vector4(
-            mElements[0] * b.x() + mElements[4] * b.y() + mElements[8] * b.z() + mElements[12] * b.w(),
-            mElements[1] * b.x() + mElements[5] * b.y() + mElements[9] * b.z() + mElements[13] * b.w(),
+            mElements[0] * b.x() + mElements[4] * b.y() + mElements[8]  * b.z() + mElements[12] * b.w(),
+            mElements[1] * b.x() + mElements[5] * b.y() + mElements[9]  * b.z() + mElements[13] * b.w(),
             mElements[2] * b.x() + mElements[6] * b.y() + mElements[10] * b.z() + mElements[14] * b.w(),
-            mElements[3] * b.x() + mElements[7] * b.y() + mElements[11] * b.z() + mElements[15] * b.w()
-        );
+            mElements[3] * b.x() + mElements[7] * b.y() + mElements[11] * b.z() + mElements[15] * b.w());
     }
 
-    void dump()
+    void dump() const
     {
-        printf("[ %f %f %f %f ]\n", mElements[0], mElements[4], mElements[8], mElements[12]);
-        printf("[ %f %f %f %f ]\n", mElements[1], mElements[5], mElements[9], mElements[13]);
-        printf("[ %f %f %f %f ]\n", mElements[2], mElements[6], mElements[10], mElements[14]);
-        printf("[ %f %f %f %f ]\n", mElements[3], mElements[7], mElements[11], mElements[15]);
+        std::printf("[ %f %f %f %f ]\n", mElements[0], mElements[4], mElements[8],  mElements[12]);
+        std::printf("[ %f %f %f %f ]\n", mElements[1], mElements[5], mElements[9],  mElements[13]);
+        std::printf("[ %f %f %f %f ]\n", mElements[2], mElements[6], mElements[10], mElements[14]);
+        std::printf("[ %f %f %f %f ]\n", mElements[3], mElements[7], mElements[11], mElements[15]);
     }
 
     float *data() { return mElements.data(); }
@@ -630,14 +630,13 @@ class Mat4
         return operator()(rowIndex, columnIndex);
     }
 
-    bool operator==(const Mat4 &m) const { return mElements == m.elements(); }
+    bool operator==(const Mat4 &m) const { return mElements == m.mElements; }
 
     bool nearlyEqual(float epsilon, const Mat4 &m) const
     {
-        const auto &otherElts = m.elements();
-        for (size_t i = 0; i < otherElts.size(); i++)
+        for (size_t i = 0; i < mElements.size(); i++)
         {
-            if ((mElements[i] - otherElts[i] > epsilon) && (otherElts[i] - mElements[i] > epsilon))
+            if (std::abs(mElements[i] - m.mElements[i]) > epsilon)
                 return false;
         }
         return true;
@@ -654,25 +653,21 @@ class Mat4
         return result;
     }
 
-    // Optimized inverse: use inverse of determinant once, then multiply instead of divide
     Mat4 inverse() const
     {
         Mat4 coft;
         CofactorTransposed(*this, coft);
 
         // Determinant via first row dot cofactor row 0
-        float det = at(0, 0) * coft(0, 0) + at(0, 1) * coft(1, 0) +
-                    at(0, 2) * coft(2, 0) + at(0, 3) * coft(3, 0);
+        const float det = at(0, 0) * coft(0, 0) + at(0, 1) * coft(1, 0) +
+                          at(0, 2) * coft(2, 0) + at(0, 3) * coft(3, 0);
 
         const float invDet = 1.0f / det;
         Mat4 result;
-        // Unroll the 16‑element scaling
-        float * __restrict r = result.mElements.data();
-        const float * __restrict c = coft.mElements.data();
-        r[0] = c[0] * invDet; r[1] = c[1] * invDet; r[2] = c[2] * invDet; r[3] = c[3] * invDet;
-        r[4] = c[4] * invDet; r[5] = c[5] * invDet; r[6] = c[6] * invDet; r[7] = c[7] * invDet;
-        r[8] = c[8] * invDet; r[9] = c[9] * invDet; r[10] = c[10] * invDet; r[11] = c[11] * invDet;
-        r[12] = c[12] * invDet; r[13] = c[13] * invDet; r[14] = c[14] * invDet; r[15] = c[15] * invDet;
+        for (size_t i = 0; i < result.mElements.size(); ++i)
+        {
+            result.mElements[i] = coft.mElements[i] * invDet;
+        }
         return result;
     }
 
