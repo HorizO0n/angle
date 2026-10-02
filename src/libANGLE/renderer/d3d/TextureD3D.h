@@ -9,6 +9,7 @@
 #ifndef LIBANGLE_RENDERER_D3D_TEXTURED3D_H_
 #define LIBANGLE_RENDERER_D3D_TEXTURED3D_H_
 
+#include <array>
 #include <functional>
 
 #include "common/Color.h"
@@ -47,9 +48,12 @@ class TextureD3D : public TextureImpl, public angle::ObserverInterface
     virtual ImageD3D *getImage(const gl::ImageIndex &index) const = 0;
     virtual GLsizei getLayerCount(int level) const                = 0;
 
-    angle::Result getImageAndSyncFromStorage(const gl::Context *context,
-                                             const gl::ImageIndex &index,
-                                             ImageD3D **outImage);
+    // Returns the ImageD3D for |index|, syncing its CPU staging buffer from |mTexStorage| if
+    // |mTexStorage| holds newer data (i.e. when |mTexStorage| is valid/complete and the image does
+    // not already have uncommitted CPU-side modifications).
+    angle::Result getImageAndSyncFromStorageIfNeeded(const gl::Context *context,
+                                                     const gl::ImageIndex &index,
+                                                     ImageD3D **outImage);
 
     GLint getBaseLevelWidth() const;
     GLint getBaseLevelHeight() const;
@@ -182,6 +186,11 @@ class TextureD3D : public TextureImpl, public angle::ObserverInterface
     virtual bool isImageComplete(const gl::ImageIndex &index) const = 0;
 
     bool canCreateRenderTargetForImage(const gl::ImageIndex &index) const;
+    angle::Result copyImageFromFramebufferToStaging(const gl::Context *context,
+                                                    const gl::ImageIndex &index,
+                                                    const gl::Offset &destOffset,
+                                                    const gl::Rectangle &clippedArea,
+                                                    gl::Framebuffer *source);
     angle::Result ensureBindFlags(const gl::Context *context, BindFlags bindFlags);
     angle::Result ensureRenderTarget(const gl::Context *context);
 
@@ -233,6 +242,10 @@ class TextureD3D : public TextureImpl, public angle::ObserverInterface
     bool mDirtyImages;
 
     bool mImmutable;
+    // True when mTexStorage is backed by an EGLImage via setEGLImageTarget
+    // (TextureStorage11_EGLImage). Only meaningful for TextureD3D_2D and TextureD3D_External, as no
+    // other D3D texture types support setEGLImageTarget.
+    bool mEGLImageTarget;
     TextureStorage *mTexStorage;
     angle::ObserverBinding mTexStorageObserverBinding;
 
@@ -385,7 +398,6 @@ class TextureD3D_2D : public TextureD3D
                                 const gl::Extents &size,
                                 bool forceRelease);
 
-    bool mEGLImageTarget;
     gl::TexLevelArray<std::unique_ptr<ImageD3D>> mImageArray;
 };
 
@@ -785,8 +797,8 @@ class TextureD3D_2DArray : public TextureD3D
     // to update all the texture layers since they cannot all be updated at once and it makes the
     // most sense for the Image class to not have to worry about layer subresource as well as mip
     // subresources.
-    GLsizei mLayerCounts[gl::IMPLEMENTATION_MAX_TEXTURE_LEVELS];
-    ImageD3D **mImageArray[gl::IMPLEMENTATION_MAX_TEXTURE_LEVELS];
+    std::array<GLsizei, gl::IMPLEMENTATION_MAX_TEXTURE_LEVELS> mLayerCounts                = {};
+    std::array<std::vector<ImageD3D *>, gl::IMPLEMENTATION_MAX_TEXTURE_LEVELS> mImageArray = {};
 };
 
 // Base class for immutable textures. These don't support manipulation of individual texture images.

@@ -9077,7 +9077,7 @@ void Context::getSemaphoreParameterui64v(SemaphoreID semaphore, GLenum pname, GL
 
 void Context::trimMemory(MemoryTrimLevel trimLevel)
 {
-    UNIMPLEMENTED();
+    mImplementation->trimMemory(this, trimLevel);
 }
 
 void Context::acquireTextures(GLuint numTextures,

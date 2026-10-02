@@ -3302,7 +3302,7 @@ angle::Result ContextVk::handleDirtyGraphicsDynamicBlendConstants(
     DirtyBits dirtyBitMask)
 {
     const gl::ColorF &color = mState.getBlendColor();
-    mRenderPassCommandBuffer->setBlendConstants(color.data());
+    mRenderPassCommandBuffer->setBlendConstants(color);
     return angle::Result::Continue;
 }
 

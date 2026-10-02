@@ -12,6 +12,7 @@
       "black_clover_m",
       "black_desert_mobile",
       "block_blast",
+      "bubble_shooter_pop_bubbles",
       "callbreak",
       "candy_crush_soda_saga",
       "car_chase",
@@ -58,7 +59,8 @@
       "trex_200",
       "umamusume_pretty_derby",
       "warcraft_rumble",
-      "wuthering_waves"
+      "wuthering_waves",
+      "wwe_supercard"
     ],
     "angle_with_capture_by_default": true,
     "dcheck_always_on": true,

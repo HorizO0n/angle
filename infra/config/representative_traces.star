@@ -38,6 +38,7 @@ REPRESENTATIVE_TRACES = [
     "black_clover_m",
     "black_desert_mobile",
     "block_blast",
+    "bubble_shooter_pop_bubbles",
     "callbreak",
     "candy_crush_soda_saga",
     "car_chase",
@@ -85,4 +86,5 @@ REPRESENTATIVE_TRACES = [
     "umamusume_pretty_derby",
     "warcraft_rumble",
     "wuthering_waves",
+    "wwe_supercard",
 ]

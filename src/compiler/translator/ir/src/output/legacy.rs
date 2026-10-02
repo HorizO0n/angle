@@ -3444,8 +3444,12 @@ BuiltInOpCode::AtomicCounterCompSwap => {
     }
     fn branch_loop_if(&mut self, block: &mut *mut TIntermBlock, condition: TypedId) {
         // The condition block of a loop ends in `if (!condition) break;`
-        // SAFETY: Pointers are obtained from C++ and passed back to it.
-        unsafe { ffi::branch_loop_if(*block, &self.get_expression(condition)) };
+        //
+        // No-op if the condition is `true`
+        if !matches!(condition.id, Id::Constant(CONSTANT_ID_TRUE)) {
+            // SAFETY: Pointers are obtained from C++ and passed back to it.
+            unsafe { ffi::branch_loop_if(*block, &self.get_expression(condition)) };
+        }
     }
     fn branch_switch(
         &mut self,
