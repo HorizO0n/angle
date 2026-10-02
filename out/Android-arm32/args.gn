@@ -50,7 +50,6 @@ angle_extra_cflags_c = [
   "-Wno-unused-but-set-variable",
   "-Wno-error",
   "-O3",
-  "-march=armv7-a+neon",
   "-mllvm",
   "-hot-cold-split=true",
   "-fdata-sections",
@@ -81,7 +80,6 @@ angle_extra_cflags_cc = [
   "-Wno-unused-but-set-variable",
   "-Wno-error",
   "-O3",
-  "-march=armv7-a+neon",
   "-mllvm",
   "-hot-cold-split=true",
   "-mllvm",
@@ -114,7 +112,6 @@ angle_extra_ldflags = [
 
 treat_warnings_as_errors = false
 libcxx_abi_unstable = true
-android_ndk_version = "r30-beta1"
 
 # Whether the ANGLE translator should be built with IR instead
 # THIS IS CURRENTLY EXPERIMENTAL.
