@@ -42,6 +42,9 @@ namespace rx
 namespace
 {
 
+constexpr size_t kMaxDeferredDeletedBuffers     = 128;
+constexpr size_t kMaxDeferredDeletedBuffersSize = 128 * 1024 * 1024;
+
 inline void SetGLBoolState(const FunctionsGL *functions, GLenum name, bool value)
 {
     if (value)
@@ -811,6 +814,7 @@ bool VertexAttribCurrentValuesEqual(const gl::VertexAttribCurrentValueData &a,
                                     const gl::VertexAttribCurrentValueData &b)
 {
     // When comparing vertex attribute current values, only compare the data, not the type.
+    // SAFETY: this is the exact comparison done in operator== for gl::VertexAttribCurrentValueData.
     return ANGLE_UNSAFE_BUFFERS(
                memcmp(&a.Values, &b.Values, sizeof(gl::VertexAttribCurrentValueData::Values))) == 0;
 }
@@ -1623,6 +1627,12 @@ StateManagerGL::StateManagerGL(const FunctionsGL *functions,
 
 StateManagerGL::~StateManagerGL()
 {
+    if (!mDeferredBufferDeletions.empty())
+    {
+        mFunctions->finish();
+        onFinish();
+    }
+
     if (mPlaceholderFbo != 0)
     {
         deleteFramebuffer(mPlaceholderFbo);
@@ -1714,7 +1724,7 @@ void StateManagerGL::deleteSampler(GLuint sampler)
     }
 }
 
-void StateManagerGL::deleteBuffer(GLuint buffer)
+void StateManagerGL::deleteBuffer(GLuint buffer, size_t clientSpecifiedSize, bool isHardenedContext)
 {
     if (buffer == 0)
     {
@@ -1725,7 +1735,7 @@ void StateManagerGL::deleteBuffer(GLuint buffer)
     {
         if (mState.buffers[target] == buffer)
         {
-            bindBuffer(target, 0);
+            bindBuffer(target, 0, isHardenedContext);
         }
 
         auto &indexedTarget = mState.indexedBuffers[target];
@@ -1756,7 +1766,29 @@ void StateManagerGL::deleteBuffer(GLuint buffer)
         }
     }
 
-    mFunctions->deleteBuffers(1, &buffer);
+    if (!isHardenedContext || !mFeatures.deferGlDeleteBuffers.enabled)
+    {
+        mFunctions->deleteBuffers(1, &buffer);
+    }
+    else
+    {
+        bool hasBeenBoundAsElementArrayBuffer = mElementArrayBuffers.erase(buffer) > 0;
+        if (mDeferredBufferDeletions.empty() ||
+            mDeferredBufferDeletions.back().serial != mCurrentSerial)
+        {
+            mDeferredBufferDeletions.push_back({mCurrentSerial, {}, 0});
+        }
+        DeferredBufferDeletions &deletions = mDeferredBufferDeletions.back();
+        deletions.buffers.push_back(buffer);
+        deletions.size += clientSpecifiedSize;
+        ++mDeferredBufferDeletionsCount;
+        mDeferredBufferDeletionsTotalSize += clientSpecifiedSize;
+        if (hasBeenBoundAsElementArrayBuffer)
+        {
+            mDeferredBufferDeletionsNeedFinish = true;
+        }
+        maybeDrainDeferredBuffers();
+    }
 }
 
 void StateManagerGL::deleteFramebuffer(GLuint fbo)
@@ -1864,7 +1896,7 @@ void StateManagerGL::forceBindVertexArray(GLuint vao)
     mLocalDirtyBits.set(gl::state::DIRTY_BIT_VERTEX_ARRAY_BINDING);
 }
 
-void StateManagerGL::bindBuffer(gl::BufferBinding target, GLuint buffer)
+void StateManagerGL::bindBuffer(gl::BufferBinding target, GLuint buffer, bool isHardenedContext)
 {
     // GL drivers differ in whether the transform feedback bind point is modified when
     // glBindTransformFeedback is called. To avoid these behavior differences we shouldn't try to
@@ -1882,6 +1914,10 @@ void StateManagerGL::bindBuffer(gl::BufferBinding target, GLuint buffer)
             if (vaoState)
             {
                 vaoState->elementArrayBuffer = buffer;
+            }
+            if (isHardenedContext && mFeatures.deferGlDeleteBuffers.enabled && buffer != 0)
+            {
+                mElementArrayBuffers.insert(buffer);
             }
         }
     }
@@ -2041,7 +2077,7 @@ angle::Result StateManagerGL::setPixelUnpackBuffer(const gl::Context *context,
     {
         bufferID = GetImplAs<BufferGL>(pixelBuffer)->getBufferID();
     }
-    bindBuffer(gl::BufferBinding::PixelUnpack, bufferID);
+    bindBuffer(gl::BufferBinding::PixelUnpack, bufferID, context->isHardenedContext());
 
     return angle::Result::Continue;
 }
@@ -2088,7 +2124,7 @@ angle::Result StateManagerGL::setPixelPackBuffer(const gl::Context *context,
     {
         bufferID = GetImplAs<BufferGL>(pixelBuffer)->getBufferID();
     }
-    bindBuffer(gl::BufferBinding::PixelPack, bufferID);
+    bindBuffer(gl::BufferBinding::PixelPack, bufferID, context->isHardenedContext());
 
     return angle::Result::Continue;
 }
@@ -2162,6 +2198,68 @@ void StateManagerGL::onSyncedFlushOrFinish()
     mHasUnflushedQueries = false;
 }
 
+void StateManagerGL::onFinish()
+{
+    if (mFeatures.deferGlDeleteBuffers.enabled)
+    {
+        mDeferredBufferDeletionsNeedFinish = false;
+        ExecutionSerial serial             = mCurrentSerial++;
+        onSerialCompleted(serial);
+    }
+}
+
+StateManagerGL::ExecutionSerial StateManagerGL::onFenceSync()
+{
+    return mCurrentSerial++;
+}
+
+StateManagerGL::ExecutionSerial StateManagerGL::onBeginQuery()
+{
+    return mCurrentSerial++;
+}
+
+void StateManagerGL::onSerialCompleted(ExecutionSerial serial)
+{
+    if (!mFeatures.deferGlDeleteBuffers.enabled)
+    {
+        return;
+    }
+
+    if (mDeferredBufferDeletions.empty() || mDeferredBufferDeletions.front().serial > serial)
+    {
+        return;
+    }
+
+    if (mDeferredBufferDeletionsNeedFinish)
+    {
+        mFunctions->finish();
+        mDeferredBufferDeletionsNeedFinish = false;
+        serial                             = mCurrentSerial++;
+    }
+
+    while (!mDeferredBufferDeletions.empty() && mDeferredBufferDeletions.front().serial <= serial)
+    {
+        DeferredBufferDeletions &deletions = mDeferredBufferDeletions.front();
+        mFunctions->deleteBuffers(static_cast<GLsizei>(deletions.buffers.size()),
+                                  deletions.buffers.data());
+        ASSERT(mDeferredBufferDeletionsCount >= deletions.buffers.size());
+        mDeferredBufferDeletionsCount -= deletions.buffers.size();
+        ASSERT(mDeferredBufferDeletionsTotalSize >= deletions.size);
+        mDeferredBufferDeletionsTotalSize -= deletions.size;
+        mDeferredBufferDeletions.pop_front();
+    }
+}
+
+void StateManagerGL::maybeDrainDeferredBuffers()
+{
+    if (mDeferredBufferDeletionsCount > kMaxDeferredDeletedBuffers ||
+        mDeferredBufferDeletionsTotalSize > kMaxDeferredDeletedBuffersSize)
+    {
+        mFunctions->finish();
+        onFinish();
+    }
+}
+
 void StateManagerGL::forcefullyFlush()
 {
     if (mFunctions->fenceSync != nullptr && mFunctions->clientWaitSync != nullptr &&
@@ -2180,6 +2278,7 @@ void StateManagerGL::forcefullyFlush()
     // Sync creation not supported or failed; fall back to finish()
     mFunctions->finish();
     onSyncedFlushOrFinish();
+    onFinish();
 }
 
 void StateManagerGL::bindRenderbuffer(GLenum type, GLuint renderbuffer)
@@ -2260,7 +2359,8 @@ void StateManagerGL::updateDrawIndirectBufferBinding(const gl::Context *context)
     if (drawIndirectBuffer != nullptr)
     {
         const BufferGL *bufferGL = GetImplAs<BufferGL>(drawIndirectBuffer);
-        bindBuffer(gl::BufferBinding::DrawIndirect, bufferGL->getBufferID());
+        bindBuffer(gl::BufferBinding::DrawIndirect, bufferGL->getBufferID(),
+                   context->isHardenedContext());
     }
 }
 
@@ -2271,7 +2371,8 @@ void StateManagerGL::updateDispatchIndirectBufferBinding(const gl::Context *cont
     if (dispatchIndirectBuffer != nullptr)
     {
         const BufferGL *bufferGL = GetImplAs<BufferGL>(dispatchIndirectBuffer);
-        bindBuffer(gl::BufferBinding::DispatchIndirect, bufferGL->getBufferID());
+        bindBuffer(gl::BufferBinding::DispatchIndirect, bufferGL->getBufferID(),
+                   context->isHardenedContext());
     }
 }
 
@@ -4159,7 +4260,7 @@ void StateManagerGL::updateMultiviewBaseViewLayerIndexUniformImpl(
         executableGL->enableLayeredRenderingPath(drawFramebufferState.getBaseViewIndex());
     }
 }
-void StateManagerGL::setDefaultVAOState(const VertexArrayStateGL &state)
+void StateManagerGL::setDefaultVAOState(const VertexArrayStateGL &state, bool isHardenedContext)
 {
     if (mState.defaultVAOState == state)
     {
@@ -4171,7 +4272,7 @@ void StateManagerGL::setDefaultVAOState(const VertexArrayStateGL &state)
     const bool supportsBindings = nativegl::SupportsVertexAttributeBindings(mFunctions);
     const bool supportsInstancing = nativegl::SupportsInstancing(mFunctions);
 
-    bindBuffer(gl::BufferBinding::ElementArray, state.elementArrayBuffer);
+    bindBuffer(gl::BufferBinding::ElementArray, state.elementArrayBuffer, isHardenedContext);
     for (GLint i = 0; i < mCaps.maxVertexAttributes; i++)
     {
         VertexAttributeGL &curAttrib       = mState.defaultVAOState.attributes[i];
@@ -4211,7 +4312,7 @@ void StateManagerGL::setDefaultVAOState(const VertexArrayStateGL &state)
             if (curAttrib.format != newAttrib.format || curAttrib.pointer != newAttrib.pointer ||
                 curBinding.buffer != newBinding.buffer || curBinding.stride != newBinding.stride)
             {
-                bindBuffer(gl::BufferBinding::Array, newBinding.buffer);
+                bindBuffer(gl::BufferBinding::Array, newBinding.buffer, isHardenedContext);
                 mFunctions->vertexAttribPointer(i, newAttrib.format->channelCount,
                                                 gl::ToGLenum(newAttrib.format->vertexAttribType),
                                                 newAttrib.format->isNorm(), newBinding.stride,
@@ -4278,8 +4379,9 @@ void StateManagerGL::setDefaultVAOState(const VertexArrayStateGL &state)
 angle::Result StateManagerGL::setState(const gl::Context *context, const ContextStateGL &state)
 {
     useProgram(state.program);
-    setDefaultVAOState(
-        state.defaultVAOState);  // Set default VAO state before binding the target vao
+    setDefaultVAOState(state.defaultVAOState,
+                       context->isHardenedContext());  // Set default VAO state before binding the
+                                                       // target vao
     bindVertexArray(state.vao);
     for (size_t attribIndex = 0; attribIndex < state.vertexAttribCurrentValues.size();
          attribIndex++)
@@ -4310,7 +4412,7 @@ angle::Result StateManagerGL::setState(const gl::Context *context, const Context
             }
         }
 
-        bindBuffer(bufferBinding, state.buffers[bufferBinding]);
+        bindBuffer(bufferBinding, state.buffers[bufferBinding], context->isHardenedContext());
     }
     for (size_t textureUnit = 0; textureUnit < gl::IMPLEMENTATION_MAX_ACTIVE_TEXTURES;
          textureUnit++)

@@ -250,6 +250,7 @@
 534082926 WIN INTEL VULKAN : TransformFeedbackTest.BufferRebinding/* = SKIP
 534082926 WIN INTEL VULKAN : TransformFeedbackTest.MultiplePaused/* = SKIP
 534082926 WIN INTEL VULKAN : TransformFeedbackTest.RecordTwiceWithBindingOffsetChange/* = SKIP
+568876655 WIN INTEL VULKAN : TransformFeedbackTest.InstancedAttributeAfterDisabledAttribDraw/* = SKIP
 534082926 WIN INTEL VULKAN : TransformFeedbackTestIOBlocks.Interleaved/* = SKIP
 40096690 WIN INTEL VULKAN : TextureBufferTestES31.UseAsXFBThenAsTextureBuffer/* = SKIP
 
@@ -2480,8 +2481,6 @@
 42264369 ANDROID GLES : GLSLTest_ES31.ShortCircuitOutOfBoundsAccess/* = SKIP
 
 // WebGPU failures
-// Flakily causes test timeout issues on Linux/NVIDIA
-517972806 WGPU LINUX NVIDIA : * = SKIP
 // Device lock up on Mac/AMD
 538326435 WGPU MAC AMD : * = SKIP
 // BasicUniformUsage tests fail too frequently with WGPU
@@ -3144,6 +3143,12 @@
 564918838 METAL : RobustResourceInitTestES3.InvalidateSliceOf3DReadback/* = SKIP
 564918838 METAL : RobustResourceInitTestES3.InvalidateSliceOf3DBlendReadback/* = SKIP
 564918838 METAL : RobustResourceInitTestES3.InvalidateLayerOf2DArrayBlendReadback/* = SKIP
+
+566108153 WIN NVIDIA VULKAN : RobustResourceInitWithInvalidationTest.InvalidateAfterDrawAndClearZeroStencil/* = SKIP
+
+568338695 VULKAN : ClearTestES3.DrawClearInvalidateClear/* = SKIP
+568338695 ARM GLES : ClearTestES3.DrawClearInvalidateClear/* = SKIP
+568338695 PIXEL4ORXL GLES : ClearTestES3.DrawClearInvalidateClear/* = SKIP
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // Slow tests, should appear last in this file
