@@ -311,7 +311,7 @@ void TDirectiveHandler::handleVersion(const angle::pp::SourceLocation &loc,
                                       angle::pp::MacroSet *macro_set)
 {
 
-    if (version == 100 || version == 110 || version == 120 || version == 150 || version == 300 || version == 310 || version == 320 || version == 330 || version == 460 || std::getenv("ANGLE_DESKTOPGL"))
+    if (version == 100 || version == 110 || version == 120 || version == 150 || version == 300 || version == 310 || version == 320 || version == 330 || version == 410 || version == 460 || std::getenv("ANGLE_DESKTOPGL"))
     {
         TSourceLoc tLoc{loc.file, loc.line, loc.file, loc.line};
         mContext.onShaderVersionDeclared(tLoc, version);

@@ -2756,11 +2756,13 @@ bool TParseContext::checkCanUseOneOfExtensions(const TSourceLoc &line,
         {
             errorMsgString    = "extension is not supported";
             errorMsgExtension = extension;
+            canUseWithWarning = true;
         }
         else if (extIter->second == EBhUndefined || extIter->second == EBhDisable)
         {
             errorMsgString    = "extension is disabled";
             errorMsgExtension = extension;
+            canUseWithWarning = true;
         }
         else if (extIter->second == EBhWarn)
         {
