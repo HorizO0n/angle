@@ -1854,10 +1854,7 @@ void GenerateCaps(const FunctionsGL *functions,
     // GL_ARB_shader_atomic_counters adds atomic counters to geometry shader
     // GL_ARB_shader_storage_buffer_object adds shader storage buffers to geometry shader
     // GL_ARB_shader_image_load_store adds images to geometry shader
-    bool hasInstancedGSSupport = functions->isAtLeastGLES(gl::Version(3, 2)) &&
-                                 functions->hasGLExtension("GL_ARB_shader_atomic_counters") &&
-                                 functions->hasGLExtension("GL_ARB_shader_storage_buffer_object") &&
-                                 functions->hasGLExtension("GL_ARB_shader_image_load_store");
+    bool hasInstancedGSSupport = functions->isAtLeastGLES(gl::Version(3, 2));
     if (hasCoreGSSupport || functions->hasGLESExtension("GL_OES_geometry_shader") ||
         functions->hasGLESExtension("GL_EXT_geometry_shader") || hasInstancedGSSupport)
     {

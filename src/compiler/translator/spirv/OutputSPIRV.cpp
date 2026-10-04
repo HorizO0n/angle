@@ -188,6 +188,44 @@ bool IsAccessChainHelperInvocation(const AccessChain &accessChain)
     return accessChain.isHelperInvocation;
 }
 
+// Returns true if the given GLSL.std.450 extended instruction requires that every operand's type
+// matches the result type exactly.  All of the instructions below are float-only variants whose
+// operands, per the GLSL.std.450 specification, must have the same basic type and shape as the
+// result.
+//
+// Ldexp is intentionally excluded: its second operand ("exp") is specified to be an integer, so
+// it must not be coerced to float.  FMod is included because it is float-only in SPIR-V.
+//
+// Instructions that only take a single operand (Sin, Cos, Sqrt, ...) are trivially satisfied by
+// their operand already matching the result type and do not need to be listed here.
+bool RequiresFloatOperandsMatchingResult(spv::GLSLstd450 inst)
+{
+    switch (inst)
+    {
+        case spv::GLSLstd450FMin:
+        case spv::GLSLstd450FMax:
+        case spv::GLSLstd450FClamp:
+        case spv::GLSLstd450FMix:
+        case spv::GLSLstd450Fma:
+        case spv::GLSLstd450Step:
+        case spv::GLSLstd450SmoothStep:
+        case spv::GLSLstd450Atan2:
+        case spv::GLSLstd450Pow:
+        case spv::GLSLstd450Distance:
+        case spv::GLSLstd450Dot:
+        case spv::GLSLstd450Cross:
+        case spv::GLSLstd450FaceForward:
+        case spv::GLSLstd450Reflect:
+        case spv::GLSLstd450Refract:
+        case spv::GLSLstd450FMod:
+        case spv::GLSLstd450ModfStruct:
+        case spv::GLSLstd450FrexpStruct:
+            return true;
+        default:
+            return false;
+    }
+}
+
 // A traverser that generates SPIR-V as it walks the AST.
 class OutputSPIRVTraverser : public TIntermTraverser
 {
@@ -3195,6 +3233,44 @@ spirv::IdRef OutputSPIRVTraverser::visitOperator(TIntermOperator *node, spirv::I
     {
         // It's an extended instruction.
         ASSERT(extendedInst != spv::GLSLstd450Bad);
+
+        // GLSL allows implicit conversions from int (and uint) to float.  For example:
+        //
+        //     min(someFloat, 0)  // 0 is an int literal
+        //     clamp(x, 0, 1)
+        //     pow(x, 2)
+        //     step(0, x)
+        //     smoothstep(0, 1, x)
+        //
+        // These are valid GLSL, and the AST contains the int literal as-is.  However, the
+        // corresponding GLSL.std.450 instructions (FMin, FClamp, Pow, Step, SmoothStep, ...)
+        // require every operand to have the same type as the result.  If we emit the int
+        // operand directly we produce invalid SPIR-V (e.g. `OpExtInst %float ... FMin %f %int_0`),
+        // which the validator rejects.
+        //
+        // Fix this by inserting an explicit int/uint -> float conversion for any operand whose
+        // basic type is not float before emitting the extended instruction.
+        //
+        // Ldexp is intentionally excluded: its second operand is specified to be an integer in
+        // both GLSL and GLSL.std.450, so it must not be coerced to float.
+        //
+        // This conversion is done before extendScalarParamsToVector so that scalar operands are
+        // already float when they get broadcast into vectors.
+        if (RequiresFloatOperandsMatchingResult(extendedInst))
+        {
+            for (size_t paramIndex = 0; paramIndex < parameters.size(); ++paramIndex)
+            {
+                const TType &paramType =
+                    node->getChildNode(paramIndex)->getAsTyped()->getType();
+                if (paramType.getBasicType() != EbtFloat)
+                {
+                    TType floatParamType = paramType;
+                    floatParamType.setBasicType(EbtFloat);
+                    parameters[paramIndex] =
+                        castBasicType(parameters[paramIndex], paramType, floatParamType, nullptr);
+                }
+            }
+        }
 
         if (extendScalarToVector)
         {
