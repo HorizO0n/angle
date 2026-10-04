@@ -19,11 +19,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Apply patches
-      shell: bash
-      run: |
-        git apply --verbose angle-patches.diff || true
-        grep -q "is_ios" third_party/vulkan-loader/BUILD.gn && echo "patch OK" || echo "patch FAILED"
 
     - name: Cache depot_tools
       id: cache-depot-tools
@@ -62,6 +57,12 @@ runs:
         echo "ANGLE_COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
         echo "DEPOT_TOOLS_COMMIT=$(git -C depot_tools rev-parse HEAD)" >> $GITHUB_ENV
         gclient sync --no-history --shallow --reset --force
+
+    - name: Apply patches
+      shell: bash
+      run: |
+        git apply --verbose angle-patches.diff || true
+        grep -q "is_ios" third_party/vulkan-loader/BUILD.gn && echo "patch OK" || echo "patch FAILED"
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@main
