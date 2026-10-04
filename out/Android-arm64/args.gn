@@ -40,7 +40,7 @@ use_lto = true
 
 angle_build_tests = false
 
-extra_cflags = [
+angle_extra_cflags = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -73,7 +73,7 @@ extra_cflags = [
   "-U__USE_GNU"
 ]
 
-extra_cflags_cc = [
+angle_extra_cflags_cc = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -106,7 +106,7 @@ extra_cflags_cc = [
   "-U__USE_GNU"
 ]
 
-extra_ldflags = [
+angle_extra_ldflags = [
   "-fuse-ld=lld",
   "-Wl,--gc-sections",
   "-flto",
