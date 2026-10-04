@@ -19,7 +19,7 @@ is_clang = true
 c_wrapper = "ccache"
 cc_wrapper = "ccache"
 
-angle_extra_cflags_c = [
+extra_cflags_c = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -48,7 +48,7 @@ angle_extra_cflags_c = [
   "-D_GNU_SOURCE"
 ]
 
-angle_extra_cflags_cc = [
+extra_cflags_cc = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -77,14 +77,13 @@ angle_extra_cflags_cc = [
   "-D_GNU_SOURCE"
 ]
 
-angle_extra_ldflags = [
+extra_ldflags = [
   "-fuse-ld=lld",
   "-Wl,--gc-sections",
   "-flto",
   "-Wl,--lto-O3",
   "-Wl,-O3",
-  "-Wl,--as-needed",
-  "-Wl,--exclude-libs,ALL"
+  "-Wl,--as-needed"
 ]
 
 # 功能开关

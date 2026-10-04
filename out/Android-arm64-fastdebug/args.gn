@@ -36,7 +36,7 @@ use_lto = true
 
 angle_build_tests = false
 
-angle_extra_cflags_c = [
+extra_cflags = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -54,10 +54,12 @@ angle_extra_cflags_c = [
   "-D_ALLBSD_SOURCE",
   "-mllvm",
   "-inlinehint-threshold=100000",
-  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS"
+  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS",
+  "-U_GNU_SOURCE",
+  "-U__USE_GNU"
 ]
 
-angle_extra_cflags_cc = [
+extra_cflags_cc = [
   "-g",
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
@@ -75,19 +77,19 @@ angle_extra_cflags_cc = [
   "-D_ALLBSD_SOURCE",
   "-mllvm",
   "-inlinehint-threshold=100000",
-  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS"
+  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS",
+  "-U_GNU_SOURCE",
+  "-U__USE_GNU"
 ]
 
-angle_extra_ldflags = [
+extra_ldflags = [
   "-fuse-ld=lld",
   "-Wl,--gc-sections",
-  "-Wl,--as-needed",
-  "-Wl,--exclude-libs,ALL"
+  "-Wl,--as-needed"
 ]
 
 treat_warnings_as_errors = false
 libcxx_abi_unstable = true
-android_ndk_version = "r30-beta1"
 
 # Whether the ANGLE translator should be built with IR instead
 # THIS IS CURRENTLY EXPERIMENTAL.

@@ -40,7 +40,7 @@ use_lto = true
 
 angle_build_tests = false
 
-angle_extra_cflags_c = [
+extra_cflags = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -68,10 +68,12 @@ angle_extra_cflags_c = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
-  "-DUNSAFE_BUFFERS_BUILD"
+  "-DUNSAFE_BUFFERS_BUILD",
+  "-U_GNU_SOURCE",
+  "-U__USE_GNU"
 ]
 
-angle_extra_cflags_cc = [
+extra_cflags_cc = [
   "-Wno-error=unused-variable",
   "-Wno-unused-variable",
   "-Wno-error=extra-semi-stmt",
@@ -99,17 +101,18 @@ angle_extra_cflags_cc = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
-  "-DUNSAFE_BUFFERS_BUILD"
+  "-DUNSAFE_BUFFERS_BUILD",
+  "-U_GNU_SOURCE",
+  "-U__USE_GNU"
 ]
 
-angle_extra_ldflags = [
+extra_ldflags = [
   "-fuse-ld=lld",
   "-Wl,--gc-sections",
   "-flto",
   "-Wl,--lto-O3",
   "-Wl,-O3",
-  "-Wl,--as-needed",
-  "-Wl,--exclude-libs,ALL"
+  "-Wl,--as-needed"
 ]
 
 treat_warnings_as_errors = false
