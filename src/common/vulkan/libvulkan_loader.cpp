@@ -22,6 +22,7 @@ static void print_message(std::string_view msg) {
     fwrite(msg.data(), 1, msg.size(), stdout);
 }
 
+#if !defined(ANGLE_PLATFORM_APPLE)
 static void* vulkan_load_from_pojavexec() {
     // 首先检查环境变量 VULKAN_PTR
     const char* vulkan_ptr_env = std::getenv("VULKAN_PTR");
@@ -70,6 +71,7 @@ static void* vulkan_load_from_pojavexec() {
 
     return nullptr;
 }
+#endif
 
 namespace angle
 {
@@ -77,17 +79,20 @@ namespace vk
 {
 void *OpenLibVulkan()
 {
+#if !defined(ANGLE_PLATFORM_APPLE)
     void* vulkan_load_from_pojavexec_result = vulkan_load_from_pojavexec();
     if (vulkan_load_from_pojavexec_result != nullptr) {
         return vulkan_load_from_pojavexec_result;
     }
 
-    print_message("[ANGLE] Warning: No environment variable VULKAN_PTR! Will load libvulkan.\n");
+    print_message("[ANGLE] WARN: No environment variable VULKAN_PTR! vulkan_loader will load libvulkan.\n");
+#endif
+
     constexpr const char *kLibVulkanNames[] = {
 #if defined(ANGLE_PLATFORM_WINDOWS)
         "vulkan-1.dll",
 #elif defined(ANGLE_PLATFORM_APPLE)
-        "libvulkan.dylib", "libvulkan.1.dylib", "libMoltenVK.dylib",
+        "libMoltenVK.dylib", "libvulkan.dylib", "libvulkan.1.dylib",
         // Fallback paths for static macOS builds where the Vulkan loader is bundled
         // in the "Libraries/" subdirectory but the host module (containing ANGLE)
         // is in the parent directory.
@@ -126,7 +131,7 @@ void *OpenLibVulkan()
         }
     }
 
-    print_message("[ANGLE] Error: failed to load libvulkan.\n");
+    print_message("[ANGLE] ERROR: failed to load libvulkan or libMoltenVK.\n");
     return nullptr;
 }
 }  // namespace vk

@@ -1,8 +1,8 @@
 diff --git a/third_party/vulkan-loader/src/BUILD.gn b/third_party/vulkan-loader/src/BUILD.gn
-index 5a73707..351b972 100644
+index 5a73707..5ec880c 100644
 --- a/third_party/vulkan-loader/src/BUILD.gn
 +++ b/third_party/vulkan-loader/src/BUILD.gn
-@@ -53,7 +53,7 @@ config("vulkan_internal_config") {
+@@ -53,14 +53,14 @@ config("vulkan_internal_config") {
        "EXTRASYSCONFDIR=\"/pkg/data\"",
      ]
    }
@@ -11,6 +11,32 @@ index 5a73707..351b972 100644
      defines += [
        "SYSCONFDIR=\"/etc\"",
        "FALLBACK_CONFIG_DIRS=\"/etc/xdg\"",
+       "FALLBACK_DATA_DIRS=\"/usr/local/share:/usr/share\"",
+     ]
+   }
+-  if (is_apple && !vulkan_loader_shared) {
++  if (is_apple) {
+     defines += [ "APPLE_STATIC_LOADER" ]
+   }
+ }
+@@ -108,7 +108,7 @@ config("vulkan_loader_config") {
+ if (!is_android) {
+   if (is_fuchsia) {
+     library_type = "sdk_shared_library"
+-  } else if (vulkan_loader_shared) {
++  } else if (vulkan_loader_shared && !is_ios) {
+     library_type = "shared_library"
+   } else {
+     library_type = "static_library"
+@@ -272,7 +272,7 @@ if (!is_android) {
+         "loader/loader_linux.h",
+       ]
+     }
+-    if (is_mac) {
++    if (is_apple) {
+       frameworks = [ "CoreFoundation.framework" ]
+     }
+     public_deps = [ "$vulkan_headers_dir:vulkan_headers" ]
 diff --git a/build/config/c++/BUILD.gn b/build/config/c++/BUILD.gn
 index 8975d68..e816df0 100644
 --- a/build/config/c++/BUILD.gn

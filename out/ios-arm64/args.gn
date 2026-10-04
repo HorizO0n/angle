@@ -27,6 +27,7 @@ angle_enable_swiftshader = false
 angle_enable_metal = true
 angle_enable_essl = true
 angle_enable_glsl = true
+angle_enable_msl=true
 
 ios_enable_code_signing = false
 angle_expose_non_conformant_extensions_and_versions = true
@@ -104,7 +105,6 @@ angle_extra_cflags_cc = [
 
 angle_extra_ldflags = [
   "-fuse-ld=lld",
-  "-Wl,-dead_strip",
   "-flto",
   "-Wl,-O3"
 ]

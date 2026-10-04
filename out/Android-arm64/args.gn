@@ -50,7 +50,6 @@ angle_extra_cflags = [
   "-Wno-unused-but-set-variable",
   "-Wno-error",
   "-O3",
-  "-march=armv8-a+simd",
   "-fno-semantic-interposition",
   "-mllvm",
   "-hot-cold-split=true",
