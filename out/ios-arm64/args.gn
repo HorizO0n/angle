@@ -52,7 +52,6 @@ angle_extra_cflags = [
   "-Wno-error",
   "-O3",
   "-march=armv8-a+simd",
-  "-fno-semantic-interposition",
   "-mllvm",
   "-hot-cold-split=true",
   "-fdata-sections",
@@ -69,9 +68,6 @@ angle_extra_cflags = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
-  "-DSYSCONFDIR=\"/etc\"",
-  "-DFALLBACK_CONFIG_DIRS=\"/etc/xdg\"",
-  "-DFALLBACK_DATA_DIRS=\"/usr/local/share:/usr/share\"",
   "-DUNSAFE_BUFFERS_BUILD"
   
 ]
@@ -87,7 +83,6 @@ angle_extra_cflags_cc = [
   "-Wno-error",
   "-O3",
   "-march=armv8-a+simd",
-  "-fno-semantic-interposition",
   "-mllvm",
   "-hot-cold-split=true",
   "-fdata-sections",
@@ -104,19 +99,14 @@ angle_extra_cflags_cc = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
-  "-DSYSCONFDIR=\"/etc\"",
-  "-DFALLBACK_CONFIG_DIRS=\"/etc/xdg\"",
-  "-DFALLBACK_DATA_DIRS=\"/usr/local/share:/usr/share\"",
   "-DUNSAFE_BUFFERS_BUILD"
 ]
 
 angle_extra_ldflags = [
   "-fuse-ld=lld",
-  "-Wl,--gc-sections",
+  "-Wl,-dead_strip",
   "-flto",
-  "-Wl,--lto-O3",
-  "-Wl,-O3",
-  "-Wl,--as-needed"
+  "-Wl,-O3"
 ]
 
 treat_warnings_as_errors = false
