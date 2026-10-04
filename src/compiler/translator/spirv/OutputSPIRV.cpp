@@ -212,12 +212,10 @@ bool RequiresFloatOperandsMatchingResult(spv::GLSLstd450 inst)
         case spv::GLSLstd450Atan2:
         case spv::GLSLstd450Pow:
         case spv::GLSLstd450Distance:
-        case spv::GLSLstd450Dot:
         case spv::GLSLstd450Cross:
         case spv::GLSLstd450FaceForward:
         case spv::GLSLstd450Reflect:
         case spv::GLSLstd450Refract:
-        case spv::GLSLstd450FMod:
         case spv::GLSLstd450ModfStruct:
         case spv::GLSLstd450FrexpStruct:
             return true;
