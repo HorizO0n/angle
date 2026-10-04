@@ -1,4 +1,4 @@
-name: ANGLE
+name: Android-ANGLE
 
 on:
   workflow_dispatch:
