@@ -4,6 +4,8 @@
 
 # import the ozone_platform_x11 variable
 import("gni/angle.gni")
+import("gni/angle_flags.gni")
+
 if (angle_enable_vulkan) {
   import("//build_overrides//vulkan_headers.gni")
 }
@@ -97,11 +99,6 @@ declare_args() {
   install_prefix = ""
 
   angle_use_crypto_hasher = build_with_chromium
-
-  angle_extra_cflags = []
-  angle_extra_cflags_c = []
-  angle_extra_cflags_cc = []
-  angle_extra_ldflags = []
 }
 
 declare_args() {
