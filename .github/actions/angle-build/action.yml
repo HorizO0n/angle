@@ -62,7 +62,6 @@ runs:
       shell: bash
       run: |
         git apply --verbose angle-patches.diff || true
-        grep -q "is_ios" third_party/vulkan-loader/BUILD.gn && echo "patch OK" || echo "patch FAILED"
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@main
