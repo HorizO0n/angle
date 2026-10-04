@@ -77,6 +77,12 @@ void GL_APIENTRY GL_BindImageTexture(GLuint unit,
                                      GLenum access,
                                      GLenum format)
 {
+
+    if (format == 0x805B) {
+        WARN() << "glBindImageTexture: GL_RGBA16 is not supported, turn into GL_RGBA16F.";
+        format = GL_RGBA16F;
+    } // GL_RGBA16 is not supported here.
+
     ASSERT(!egl::Display::GetCurrentThreadUnlockedTailCall()->any());
     Context *context = GetValidGlobalContext();
     EVENT(context, GLBindImageTexture,
