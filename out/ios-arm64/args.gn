@@ -70,7 +70,11 @@ angle_extra_cflags_c = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
+  "-DSYSCONFDIR=\"/etc\"",
+  "-DFALLBACK_CONFIG_DIRS=\"/etc/xdg\"",
+  "-DFALLBACK_DATA_DIRS=\"/usr/local/share:/usr/share\"",
   "-DUNSAFE_BUFFERS_BUILD"
+  
 ]
 
 angle_extra_cflags_cc = [
@@ -101,6 +105,9 @@ angle_extra_cflags_cc = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
+  "-DSYSCONFDIR=\"/etc\"",
+  "-DFALLBACK_CONFIG_DIRS=\"/etc/xdg\"",
+  "-DFALLBACK_DATA_DIRS=\"/usr/local/share:/usr/share\"",
   "-DUNSAFE_BUFFERS_BUILD"
 ]
 
