@@ -114,7 +114,7 @@ angle_enable_trace = false
 angle_enable_perf_counter_output = false
 angle_has_frame_capture = false
 
-angle_standalone = true
+angle_standalone = false
 angle_ir = false
 angle_force_context_check_every_call = false
 

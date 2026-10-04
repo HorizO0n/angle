@@ -12,8 +12,7 @@ use_goma = false
 dcheck_always_on = false
 angle_assert_always_on = false
 is_clang = true
-android_ndk_api_level = 26
-strip_debug_info = true
+strip_debug_info = false
 generate_debug_info = false
 enable_resource_allowlist_generation = false
 angle_enable_vulkan = true
@@ -130,17 +129,17 @@ angle_ir = false
 
 angle_enable_perf_counter_output = false
 
-angle_standalone = true
+angle_standalone = false
 
 angle_has_frame_capture = false
 
-enable_stripping = true
+enable_stripping = false
 
 use_cxx23 = true
 
 cc_wrapper = "ccache"
 
-enable_unused_resource_stripping = true
+enable_unused_resource_stripping = false
 exclude_unwind_tables = true
 use_clang_coverage = false
 angle_force_context_check_every_call = false

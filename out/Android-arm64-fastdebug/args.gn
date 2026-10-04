@@ -95,7 +95,7 @@ angle_ir = false
 
 angle_enable_perf_counter_output = true
 
-angle_standalone = true
+angle_standalone = false
 
 angle_has_frame_capture = true
 
