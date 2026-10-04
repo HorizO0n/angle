@@ -73,7 +73,7 @@ jobs:
           cp .gn .gn.bak 2>/dev/null; if grep -q 'expand_directory_allowlist' .gn 2>/dev/null; then sed -i 's|]|,\n  "//build/modules/BUILD.gn"\n]|' .gn; else echo 'expand_directory_allowlist = [ "//build/modules/BUILD.gn" ]' >> .gn; fi
           gn gen out/ios-${{matrix.arch}} --threads=$(nproc)
           gn args out/ios-${{ matrix.arch }} --list --short
-          autoninja -C out/ios-${{matrix.arch}} -j $(nproc)
+          autoninja -C out/ios-${{matrix.arch}} -j 8
 
       - name: Dump logs on failure
         if: failure()
