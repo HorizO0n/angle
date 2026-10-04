@@ -1,4 +1,4 @@
-name: ANGLE
+name: GNU-LINUX-ANGLE
 
 on:
   workflow_dispatch:
