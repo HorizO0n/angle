@@ -258,20 +258,21 @@ bool ValidateTexImageFormatCombination(const Context *context,
 {
     // The type and format are valid if any supported internal format has that type and format.
     // ANGLE_texture_external_yuv_sampling extension adds support for YUV formats
-    /*if (gl::IsYuvFormat(format))
+    if (gl::IsYuvFormat(format))
     {
-        if (!context->getExtensions().yuvInternalFormatANGLE)
+        /*if (!context->getExtensions().yuvInternalFormatANGLE)
         {
             ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kInvalidFormat);
             return false;
-        }
+        }*/
     }
     else
     {
         if (!ValidES3Format(format))
         {
-            ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kInvalidFormat);
-            return false;
+            //ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kInvalidFormat);
+            std::cout << "Invalid format.";
+            //return false;
         }
     }
 
@@ -279,7 +280,7 @@ bool ValidateTexImageFormatCombination(const Context *context,
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_ENUM, kInvalidType);
         return false;
-    }*/
+    }
 
     // For historical reasons, glTexImage2D and glTexImage3D pass in their internal format as a
     // GLint instead of a GLenum. Therefor an invalid internal format gives a GL_INVALID_VALUE
@@ -288,7 +289,8 @@ bool ValidateTexImageFormatCombination(const Context *context,
 #ifdef ANGLE_ENABLE_DEBUG_ANNOTATIONS
     if (!ValidES3InternalFormat(internalFormat))
     {
-        ANGLE_VALIDATION_ERRORF(GL_INVALID_VALUE, kInvalidInternalFormat, internalFormat);
+        //ANGLE_VALIDATION_ERRORF(GL_INVALID_VALUE, kInvalidInternalFormat, internalFormat);
+        std::cout << "Invalid internal format";
         WARN() << "ValidateTexImageFormatCombination: target=" << static_cast<int>(target)
             << ", internalFormat=0x" << std::hex << internalFormat
             << ", format=0x" << format
@@ -305,12 +307,12 @@ bool ValidateTexImageFormatCombination(const Context *context,
     // INVALID_OPERATION error.
     //
     // Similar language exists in OES_texture_stencil8.
-    /*if (target == TextureType::_3D &&
+    if (target == TextureType::_3D &&
         (format == GL_DEPTH_COMPONENT || format == GL_DEPTH_STENCIL || format == GL_STENCIL_INDEX))
     {
         ANGLE_VALIDATION_ERROR(GL_INVALID_OPERATION, k3DDepthStencil);
         return false;
-    }*/
+    }
 
     // Check if this is a valid format combination to load texture data
     // ANGLE_texture_external_yuv_sampling extension adds support for YUV formats
