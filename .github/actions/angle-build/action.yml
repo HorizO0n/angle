@@ -3,16 +3,16 @@ description: 'Build ANGLE for a given platform/arch'
 
 inputs:
   platform:
-    description: 'android | ios | linux (used only for cache/artifact naming)'
+    description: 'android | ios | linux'
     required: true
   arch:
-    description: 'Target architecture (used only for cache/artifact naming)'
+    description: 'Target architecture'
     required: true
   out-dir:
-    description: 'GN output directory name, e.g. Android-arm64 / ios-arm64 / linux-x86_64'
+    description: 'GN output directory name'
     required: true
   upload-path:
-    description: 'Glob of files to upload, relative to the out-dir'
+    description: 'Glob of files/directories to upload, relative to the out-dir'
     required: false
     default: '*.so'
 
@@ -80,6 +80,19 @@ runs:
         gn args out/${{ inputs.out-dir }} --list --short
         autoninja -C out/${{ inputs.out-dir }} -j 8
 
+    - name: List build outputs
+      if: success()
+      shell: bash
+      run: |
+        echo "=== Top-level ==="
+        ls -la out/${{ inputs.out-dir }}/ || true
+        echo "=== Frameworks ==="
+        find out/${{ inputs.out-dir }} -maxdepth 3 -name "*.framework" -type d || true
+        echo "=== Dylibs ==="
+        find out/${{ inputs.out-dir }} -maxdepth 3 -name "*.dylib" || true
+        echo "=== .so ==="
+        find out/${{ inputs.out-dir }} -maxdepth 3 -name "*.so" || true
+
     - name: Dump logs on failure
       if: failure()
       shell: bash
@@ -93,3 +106,4 @@ runs:
       with:
         name: angle-${{ inputs.platform }}-${{ inputs.arch }}-${{ github.run_number }}
         path: out/${{ inputs.out-dir }}/${{ inputs.upload-path }}
+        if-no-files-found: warn
