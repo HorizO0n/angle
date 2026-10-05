@@ -7,8 +7,8 @@
 //    A class to process and submit Vulkan command buffers.
 //
 
-#ifndef LIBANGLE_RENDERER_VULKAN_COMMAND_Queue_H_
-#define LIBANGLE_RENDERER_VULKAN_COMMAND_Queue_H_
+#ifndef LIBANGLE_RENDERER_VULKAN_COMMANDQUEUE_H_
+#define LIBANGLE_RENDERER_VULKAN_COMMANDQUEUE_H_
 
 #include <atomic>
 #include <condition_variable>
@@ -30,9 +30,8 @@ namespace vk
 class ExternalFence;
 using SharedExternalFence = std::shared_ptr<ExternalFence>;
 
-// Optimize: Increase limits to reduce blocking under heavy load.
-constexpr size_t kInFlightCommandsLimit    = 100u;   // was 50
-constexpr size_t kMaxFinishedCommandsLimit = 128u;   // was 64
+constexpr size_t kInFlightCommandsLimit    = 50u;   // was 50
+constexpr size_t kMaxFinishedCommandsLimit = 64u;   // was 64
 static_assert(kInFlightCommandsLimit <= kMaxFinishedCommandsLimit);
 
 struct CommandQueuePerfCounters
@@ -658,4 +657,4 @@ class [[nodiscard]] ScopedPrimaryCommandBuffer final
 
 }  // namespace rx
 
-#endif  // LIBANGLE_RENDERER_VULKAN_COMMAND_Queue_H_
+#endif  // LIBANGLE_RENDERER_VULKAN_COMMANDQUEUE_H_

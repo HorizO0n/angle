@@ -3182,6 +3182,47 @@ spirv::IdRef OutputSPIRVTraverser::visitOperator(TIntermOperator *node, spirv::I
     {
         ASSERT(parameters.size() == 2);
 
+        // GLSL allows implicit int/uint to float conversion in operators that mix a float
+        // operand with an integer literal, for example:
+        //
+        //     float x; ... if (x == 0) ...      // EOpEqualComponentWise
+        //     vec3 v;  ... v < vec3(1) ...      // EOpLessThanComponentWise
+        //
+        // The SPIR-V OpFOrd*/OpFUnord* instructions require both operands to have exactly
+        // the same type.  If the selected binary instruction is one of the float comparison
+        // instructions, coerce every non-float operand to float.  Without this, the translator
+        // emits e.g.
+        //
+        //     %r = OpFOrdEqual %bool %float_value %int_0
+        //
+        // which the SPIR-V validator rejects with
+        // "Expected left and right operands to have the same type: FOrdEqual".
+        //
+        // Casting is done before extendScalarParamsToVector so that scalar operands are
+        // already float when they get broadcast into vectors.
+        if (writeBinaryOp == spirv::WriteFOrdEqual ||
+            writeBinaryOp == spirv::WriteFUnordNotEqual ||
+            writeBinaryOp == spirv::WriteFOrdLessThan ||
+            writeBinaryOp == spirv::WriteFOrdGreaterThan ||
+            writeBinaryOp == spirv::WriteFOrdLessThanEqual ||
+            writeBinaryOp == spirv::WriteFOrdGreaterThanEqual)
+        {
+            const size_t compareParamCount =
+                std::min<size_t>(parameters.size(), node->getChildCount());
+            for (size_t paramIndex = 0; paramIndex < compareParamCount; ++paramIndex)
+            {
+                const TType &paramType =
+                    node->getChildNode(paramIndex)->getAsTyped()->getType();
+                if (paramType.getBasicType() != EbtFloat)
+                {
+                    TType floatParamType = paramType;
+                    floatParamType.setBasicType(EbtFloat);
+                    parameters[paramIndex] = castBasicType(parameters[paramIndex], paramType,
+                                                           floatParamType, nullptr);
+                }
+            }
+        }
+
         if (extendScalarToVector)
         {
             extendScalarParamsToVector(node, builtInResultTypeId, &parameters);
@@ -3316,6 +3357,46 @@ spirv::IdRef OutputSPIRVTraverser::createCompare(TIntermOperator *node, spirv::I
     // Load the left and right values.
     spirv::IdRefList parameters = loadAllParams(node, 0, nullptr);
     ASSERT(parameters.size() == 2);
+
+    // GLSL allows implicit int/uint to float conversion in the == and != operators,
+    // for example `floatVar == 0` or `floatVar != 1`.  The SPIR-V OpFOrdEqual and
+    // OpFUnordNotEqual instructions require both operands to have exactly the same
+    // type, so if either operand is float, coerce the other one to float.  Without
+    // this, the translator emits e.g.
+    //
+    //     %r = OpFOrdEqual %bool %float_value %int_0
+    //
+    // which the SPIR-V validator rejects with
+    // "Expected left and right operands to have the same type: FOrdEqual".
+    {
+        bool anyFloat = false;
+        for (size_t paramIndex = 0; paramIndex < parameters.size(); ++paramIndex)
+        {
+            const TType &paramType =
+                node->getChildNode(paramIndex)->getAsTyped()->getType();
+            if (paramType.getBasicType() == EbtFloat)
+            {
+                anyFloat = true;
+                break;
+            }
+        }
+
+        if (anyFloat)
+        {
+            for (size_t paramIndex = 0; paramIndex < parameters.size(); ++paramIndex)
+            {
+                const TType &paramType =
+                    node->getChildNode(paramIndex)->getAsTyped()->getType();
+                if (paramType.getBasicType() != EbtFloat)
+                {
+                    TType floatParamType = paramType;
+                    floatParamType.setBasicType(EbtFloat);
+                    parameters[paramIndex] = castBasicType(parameters[paramIndex], paramType,
+                                                           floatParamType, nullptr);
+                }
+            }
+        }
+    }
 
     // In GLSL, operators == and != can operate on the following:
     //

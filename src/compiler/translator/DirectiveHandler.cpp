@@ -292,7 +292,7 @@ void TDirectiveHandler::handleExtension(const angle::pp::SourceLocation &loc,
     switch (behaviorVal)
     {
         case EBhRequire:
-            mDiagnostics.error(loc, "extension is not supported", name.c_str());
+            mDiagnostics.warning(loc, "extension is not supported", name.c_str());
             break;
         case EBhEnable:
         case EBhWarn:
