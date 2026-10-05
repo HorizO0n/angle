@@ -58,7 +58,7 @@ default_args = {
   vma_vulkan_headers_dir = "//third_party/vulkan-headers/src"
 
   # Use Siso instead of Ninja.
-  use_siso = true
+  use_siso = false
 
   # TODO(439777063): llvm and Dawn need to fix includes
   use_clang_modules = false
