@@ -67,4 +67,4 @@ jobs:
           platform: ios
           arch: arm64
           out-dir: ios-arm64
-          upload-path: '*.dylib'
+          upload-path: '*.framework'
