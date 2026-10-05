@@ -67,4 +67,7 @@ jobs:
           platform: ios
           arch: arm64
           out-dir: ios-arm64
-          upload-path: '*.framework'
+          upload-path: |
+              libGLESv2.framework/**
+              libEGL.framework/**
+              libGLESv1_CM.framework/**
