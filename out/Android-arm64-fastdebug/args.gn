@@ -45,6 +45,7 @@ angle_extra_cflags = [
   "-Wno-unsafe-buffer-usage",
   "-Wno-unused-function",
   "-Wno-unused-but-set-variable",
+  "-Wno-unused-command-line-argument",
   "-Wno-error",
   "-g",
   "-O2",
@@ -53,9 +54,7 @@ angle_extra_cflags = [
   "-D_ALLBSD_SOURCE",
   "-mllvm",
   "-inlinehint-threshold=100000",
-  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS",
-  "-U_GNU_SOURCE",
-  "-U__USE_GNU"
+  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS"
 ]
 
 angle_extra_cflags_cc = [
@@ -68,6 +67,7 @@ angle_extra_cflags_cc = [
   "-Wno-unsafe-buffer-usage",
   "-Wno-unused-function",
   "-Wno-unused-but-set-variable",
+  "-Wno-unused-command-line-argument",
   "-Wno-error",
   "-O2",
   "-D_FILE_OFFSET_BITS=64",
@@ -75,9 +75,7 @@ angle_extra_cflags_cc = [
   "-D_ALLBSD_SOURCE",
   "-mllvm",
   "-inlinehint-threshold=100000",
-  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS",
-  "-U_GNU_SOURCE",
-  "-U__USE_GNU"
+  "-DANGLE_ENABLE_DEBUG_ANNOTATIONS"
 ]
 
 angle_extra_ldflags = [

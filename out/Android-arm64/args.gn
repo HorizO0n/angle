@@ -48,6 +48,7 @@ angle_extra_cflags = [
   "-Wno-error=unsafe-buffer-usage",
   "-Wno-unused-function",
   "-Wno-unused-but-set-variable",
+  "-Wno-unused-command-line-argument",
   "-Wno-error",
   "-O3",
   "-fno-semantic-interposition",
@@ -67,9 +68,7 @@ angle_extra_cflags = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
-  "-DUNSAFE_BUFFERS_BUILD",
-  "-U_GNU_SOURCE",
-  "-U__USE_GNU"
+  "-DUNSAFE_BUFFERS_BUILD"
 ]
 
 angle_extra_cflags_cc = [
@@ -80,6 +79,7 @@ angle_extra_cflags_cc = [
   "-Wno-error=unsafe-buffer-usage",
   "-Wno-unused-function",
   "-Wno-unused-but-set-variable",
+  "-Wno-unused-command-line-argument",
   "-Wno-error",
   "-O3",
   "-fno-semantic-interposition",
@@ -99,9 +99,7 @@ angle_extra_cflags_cc = [
   "-D_FILE_OFFSET_BITS=64",
   "-D__USE_BSD",
   "-D_ALLBSD_SOURCE",
-  "-DUNSAFE_BUFFERS_BUILD",
-  "-U_GNU_SOURCE",
-  "-U__USE_GNU"
+  "-DUNSAFE_BUFFERS_BUILD"
 ]
 
 angle_extra_ldflags = [
