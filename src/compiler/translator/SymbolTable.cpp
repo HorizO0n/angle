@@ -386,7 +386,6 @@ void TSymbolTable::redeclare(TSymbol *symbol)
     ASSERT(!symbol->isFunction());
     mTable.back()->redeclare(symbol);
 }
-#endif
 
 bool TSymbolTable::declareInternal(TSymbol *symbol)
 {
@@ -395,6 +394,7 @@ bool TSymbolTable::declareInternal(TSymbol *symbol)
     ASSERT(!symbol->isFunction());
     return mTable.back()->insert(symbol);
 }
+#endif
 
 void TSymbolTable::declareUserDefinedFunction(TFunction *function, bool insertUnmangledName)
 {
