@@ -5415,6 +5415,21 @@ bool OutputSPIRVTraverser::visitBinary(Visit visit, TIntermBinary *node)
                 accessChainLoad(&mNodeData.back(), rightType, nullptr);
             mNodeData.pop_back();
 
+            // If the basic types differ, insert an explicit conversion.  GLSL allows assignment
+            // between ivec/uvec/bvec/vec types with implicit scalar conversion (for example
+            // `shadowTexCoord = UV2;` where shadowTexCoord is vec2 and UV2 is ivec2).  The
+            // right-hand side is loaded with its own type, so without an explicit cast the
+            // value stored has the wrong basic type and OpStore is rejected by the validator:
+            //
+            //     OpStore Pointer <id> 'X's type does not match Object <id> 'Y's type.
+            //
+            // castBasicType emits the necessary OpConvertSToF / OpConvertUToF / OpSelect etc.
+            spirv::IdRef valueToStore = rightValue;
+            if (leftType.getBasicType() != rightType.getBasicType())
+            {
+                valueToStore = castBasicType(rightValue, rightType, leftType, nullptr);
+            }
+
             // Defensive handling of a shape mismatch between the two sides of the assignment.
             // Such a mismatch can be produced by an earlier AST transform that shrinks an array
             // without also updating the assignment's RHS type.  The known case is shrinking
@@ -5429,7 +5444,6 @@ bool OutputSPIRVTraverser::visitBinary(Visit visit, TIntermBinary *node)
             // elements are copied from the source as fit, and any remaining destination slots
             // are filled with OpConstantNull.  The result therefore has exactly the same shape
             // as the destination, so OpStore is well-typed.
-            spirv::IdRef valueToStore = rightValue;
             if (leftType.isArray() && rightType.isArray() &&
                 leftType.getOutermostArraySize() != rightType.getOutermostArraySize())
             {
@@ -5452,7 +5466,7 @@ bool OutputSPIRVTraverser::visitBinary(Visit visit, TIntermBinary *node)
                     const spirv::IdRef elementId = mBuilder.getNewId(decorations);
                     spirv::WriteCompositeExtract(
                         mBuilder.getSpirvCurrentFunctionBlock(), elementTypeId, elementId,
-                        rightValue, {spirv::LiteralInteger(static_cast<uint32_t>(i))});
+                        valueToStore, {spirv::LiteralInteger(static_cast<uint32_t>(i))});
                     elements.push_back(elementId);
                 }
 
@@ -5464,7 +5478,7 @@ bool OutputSPIRVTraverser::visitBinary(Visit visit, TIntermBinary *node)
 
                 valueToStore = mBuilder.getNewId(decorations);
                 spirv::WriteCompositeConstruct(mBuilder.getSpirvCurrentFunctionBlock(),
-                                               destTypeId, valueToStore, elements);
+                                       destTypeId, valueToStore, elements);
             }
 
             // Store into the access chain.  Since the result of the (a = b) expression is b,
