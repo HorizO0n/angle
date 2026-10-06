@@ -25,7 +25,7 @@ static void print_message(std::string_view msg) {
 #if !defined(ANGLE_PLATFORM_APPLE)
 static void* vulkan_load_from_env() {
     const char* vulkan_ptr_env = std::getenv("VULKAN_PTR");
-    const char* turnipEnv = std::getenv("ANGLE_LOAD_FROM_ENV"); // depends on launchers....
+    const char* turnipEnv = std::getenv("ANGLE_LOAD_VULKAN_FROM_ENV"); // depends on launchers....
 
     if (vulkan_ptr_env && turnipEnv && std::string(turnipEnv) == "true") {
         std::string msg = std::format("[ANGLE] Use VULKAN_PTR = {}\n", vulkan_ptr_env);
@@ -85,7 +85,7 @@ void *OpenLibVulkan()
 {
 #if !defined(ANGLE_PLATFORM_APPLE)
     // Turnip in Pojav Backend seems to be not able to be loaded twice.
-    vulkan_load_result = vulkan_load_from_env();
+    void* vulkan_load_result = vulkan_load_from_env();
     if (vulkan_load_result == nullptr) {
         vulkan_load_result = vulkan_load_from_pojavexec();
     }
