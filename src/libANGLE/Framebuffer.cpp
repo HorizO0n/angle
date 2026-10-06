@@ -2232,6 +2232,11 @@ void Framebuffer::updateAttachment(const Context *context,
     onDirtyBinding->bind(resource);
     mAttachmentChangedAfterEnablingFoveation = isFoveationEnabled();
 
+    if (resource == nullptr)
+    {
+        mImpl->onAttachmentDetached(context, dirtyBit);
+    }
+
     invalidateCompletenessCache();
 }
 
