@@ -372,8 +372,9 @@ class OutputSPIRVTraverser : public TIntermTraverser
                                const TType &expectedType,
                                spirv::IdRef *resultTypeIdOut);
     spirv::IdRef castFloatType(spirv::IdRef value,
-                               const TType &valueType,
-                               spirv::IdRef *resultTypeIdOut);
+                           const TType &valueType,
+                           const SpirvTypeSpec &expectedTypeSpec,
+                           spirv::IdRef *resultTypeIdOut);
     spirv::IdRef cast(spirv::IdRef value,
                       const TType &valueType,
                       const SpirvTypeSpec &valueTypeSpec,
@@ -4416,56 +4417,38 @@ spirv::IdRef OutputSPIRVTraverser::createInterpolate(TIntermOperator *node,
 
 spirv::IdRef OutputSPIRVTraverser::castFloatType(spirv::IdRef value,
                                                  const TType &valueType,
+                                                 const SpirvTypeSpec &expectedTypeSpec,
                                                  spirv::IdRef *resultTypeIdOut)
 {
     ASSERT(valueType.getBasicType() == EbtFloat);
     SpirvType valueSpirvType = mBuilder.getSpirvType(valueType, {});
-    spirv::IdRef castTypeId;  // default to invalid
-    spirv::IdRef castValue;   // default fo invalid
-    // OpFConvert only works for scalar or vector data types
-    // If it is matrix type, we need to first extract each column, convert each column, and
-    // composite a new matrix
+    spirv::IdRef castTypeId;
+    spirv::IdRef castValue;
+
     if (valueType.isMatrix())
     {
-        // Get the matrix column SPIR-V type Id.
-        // We need this type Id to create the OpCompositeExtract instruction that extract each
-        // column of the matrix
         TType currentMatrixColumnType = valueType;
         currentMatrixColumnType.toMatrixColumnType();
         SpirvType currentMatrixColumnSpirvType = mBuilder.getSpirvType(currentMatrixColumnType, {});
-        // In below case:
-        // uniform mat3x4 uniMat3x4[5];
-        // uniMat3x4[i] qualifier is EvqTemporary, in which case the
-        // typeSpec.precision is not set to UseFP16.
-        // We need to set the bit to true to get the correct 16-bit float data type.
         currentMatrixColumnSpirvType.typeSpec.precision = SPIRVPrecisionChoice::UseFP16;
         const spirv::IdRef currentMatrixColumnTypeId =
             mBuilder.getSpirvTypeData(currentMatrixColumnSpirvType, nullptr).id;
 
-        // Get the converted matrix column SPIR-V type Id.
-        // We need this type Id to creat the OpFConvert instruction that converts each column of the
-        // matrix
         SpirvType expectedMatrixColumnSpirvType          = currentMatrixColumnSpirvType;
-        expectedMatrixColumnSpirvType.typeSpec.precision = SPIRVPrecisionChoice::Default;
+        expectedMatrixColumnSpirvType.typeSpec.precision = expectedTypeSpec.precision;
         const spirv::IdRef expectedMatrixColumnTypeId =
             mBuilder.getSpirvTypeData(expectedMatrixColumnSpirvType, nullptr).id;
 
-        // Extract each column of the matrix and converted them to the expected type
         const size_t matrixColCount = valueType.getCols();
         spirv::IdRefList convertedMatrixColIds;
         for (size_t i = 0; i < matrixColCount; ++i)
         {
-            // Extract each column vector from the matrix
             const spirv::IdRef currentMatrixColumnExtractId =
                 mBuilder.getNewId(mBuilder.getDecorations(valueType));
             spirv::WriteCompositeExtract(mBuilder.getSpirvCurrentFunctionBlock(),
                                          currentMatrixColumnTypeId, currentMatrixColumnExtractId,
                                          value, {spirv::LiteralInteger(static_cast<uint32_t>(i))});
 
-            // Convert each column
-            // Decorate the converted matrix column with "RelaxedPrecision", if the current matrix
-            // column are using 16-bit floats, so that compilers will be able to treat the converted
-            // matrix column as 16-bit floats.
             const spirv::IdRef expectedMatrixColumnTypeExtractId =
                 mBuilder.getNewId(mBuilder.getDecorations(valueType));
             spirv::WriteFConvert(mBuilder.getSpirvCurrentFunctionBlock(),
@@ -4474,21 +4457,17 @@ spirv::IdRef OutputSPIRVTraverser::castFloatType(spirv::IdRef value,
             convertedMatrixColIds.push_back(expectedMatrixColumnTypeExtractId);
         }
 
-        // Finally construct the new matrix with the converted columns
-        valueSpirvType.typeSpec.precision = SPIRVPrecisionChoice::Default;
-        castTypeId                        = mBuilder.getSpirvTypeData(valueSpirvType, nullptr).id;
-        // Decorate the converted matrix with "RelaxedPrecision", too.
-        castValue = mBuilder.getNewId(mBuilder.getDecorations(valueType));
+        valueSpirvType.typeSpec.precision = expectedTypeSpec.precision;
+        castTypeId = mBuilder.getSpirvTypeData(valueSpirvType, nullptr).id;
+        castValue  = mBuilder.getNewId(mBuilder.getDecorations(valueType));
         spirv::WriteCompositeConstruct(mBuilder.getSpirvCurrentFunctionBlock(), castTypeId,
                                        castValue, convertedMatrixColIds);
     }
     else
     {
-        valueSpirvType.typeSpec.precision = SPIRVPrecisionChoice::Default;
-
+        valueSpirvType.typeSpec.precision = expectedTypeSpec.precision;
         castTypeId = mBuilder.getSpirvTypeData(valueSpirvType, nullptr).id;
-        // Decorate the converted variable with "RelaxedPrecision"
-        castValue = mBuilder.getNewId(mBuilder.getDecorations(valueType));
+        castValue  = mBuilder.getNewId(mBuilder.getDecorations(valueType));
         spirv::WriteFConvert(mBuilder.getSpirvCurrentFunctionBlock(), castTypeId, castValue, value);
     }
 
@@ -4496,7 +4475,6 @@ spirv::IdRef OutputSPIRVTraverser::castFloatType(spirv::IdRef value,
     {
         *resultTypeIdOut = castTypeId;
     }
-
     return castValue;
 }
 
@@ -4781,10 +4759,17 @@ spirv::IdRef OutputSPIRVTraverser::cast(spirv::IdRef value,
         }
         else
         {
-            // 32-bit floats and 16-bit floats cast is done here
-            ASSERT(valueTypeSpec.precision == SPIRVPrecisionChoice::UseFP16 &&
-                   expectedTypeSpec.precision == SPIRVPrecisionChoice::Default);
-            return castFloatType(value, valueType, resultTypeIdOut);
+            // 32-bit <-> 16-bit float conversion.  Both directions are supported so that a value
+            // normalized to Default precision by accessChainLoad() can be stored through a UseFP16
+            // access chain (and vice versa).  Emitting the OpStore without this conversion would
+            // trigger:
+            //
+            //     OpStore Pointer <id> 'X's type does not match Object <id> 'Y's type.
+            //
+            // |expectedTypeSpec.precision| carries the destination precision; castFloatType uses
+            // it to build the result type.
+            ASSERT(valueTypeSpec.precision != expectedTypeSpec.precision);
+            return castFloatType(value, valueType, expectedTypeSpec, resultTypeIdOut);
         }
     }
 
