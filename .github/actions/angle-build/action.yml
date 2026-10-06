@@ -68,13 +68,19 @@ runs:
       with:
         key: angle-ccache-${{ runner.os }}-${{ inputs.platform }}-${{ inputs.arch }}
         max-size: '8G'
-        update-package-index: 'true'
+        update-package-index: true
+        restore: true
+        variant: 'ccache'
+        save: true
+        append-timestamp: true
+        install: 'yes'
+        job-summary: 'CCache Statistics'
 
     - name: Build ANGLE
       shell: bash
       run: |
         export PATH=`pwd`/depot_tools:$PATH
-        export NDK_CCACHE="ccache"
+        ccache -z
         cp .gn .gn.bak 2>/dev/null; if grep -q 'expand_directory_allowlist' .gn 2>/dev/null; then sed -i 's|]|,\n  "//build/modules/BUILD.gn"\n]|' .gn; else echo 'expand_directory_allowlist = [ "//build/modules/BUILD.gn" ]' >> .gn; fi
         gn gen out/${{ inputs.out-dir }} --threads=8
         gn args out/${{ inputs.out-dir }} --list --short

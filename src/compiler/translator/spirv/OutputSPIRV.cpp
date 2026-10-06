@@ -5421,14 +5421,70 @@ bool OutputSPIRVTraverser::visitBinary(Visit visit, TIntermBinary *node)
 
         case EOpAssign:
         {
-            // Load the right hand side of assignment.
+            const TType &leftType  = node->getLeft()->getType();
+            const TType &rightType = node->getRight()->getType();
+
+            // Load the right hand side of assignment using its own type so the loaded value
+            // has the correct SPIR-V type.
             const spirv::IdRef rightValue =
-                accessChainLoad(&mNodeData.back(), node->getRight()->getType(), nullptr);
+                accessChainLoad(&mNodeData.back(), rightType, nullptr);
             mNodeData.pop_back();
 
-            // Store into the access chain.  Since the result of the (a = b) expression is b, change
-            // the access chain to an unindexed rvalue which is |rightValue|.
-            accessChainStore(&mNodeData.back(), rightValue, node->getLeft()->getType());
+            // Defensive handling of a shape mismatch between the two sides of the assignment.
+            // Such a mismatch can be produced by an earlier AST transform that shrinks an array
+            // without also updating the assignment's RHS type.  The known case is shrinking
+            // webgl_FragData from vec4[N] down to vec4[1] while leaving the RHS of the
+            // assignment as vec4[N].  If the mismatched value were passed straight through to
+            // accessChainStore(), the generated OpStore would have a pointer type and an object
+            // type that disagree, and the SPIR-V validator would reject the module with:
+            //
+            //     OpStore Pointer <id> 'X's type does not match Object <id> 'Y's type.
+            //
+            // To fix that, the value is rebuilt with the destination's shape: as many leading
+            // elements are copied from the source as fit, and any remaining destination slots
+            // are filled with OpConstantNull.  The result therefore has exactly the same shape
+            // as the destination, so OpStore is well-typed.
+            spirv::IdRef valueToStore = rightValue;
+            if (leftType.isArray() && rightType.isArray() &&
+                leftType.getOutermostArraySize() != rightType.getOutermostArraySize())
+            {
+                TType elementType(rightType);
+                elementType.toArrayElementType();
+                const spirv::IdRef elementTypeId = mBuilder.getTypeData(elementType, {}).id;
+                const spirv::IdRef destTypeId    = mBuilder.getTypeData(leftType, {}).id;
+
+                const SpirvDecorations decorations = mBuilder.getDecorations(leftType);
+
+                const size_t destSize  = leftType.getOutermostArraySize();
+                const size_t srcSize   = rightType.getOutermostArraySize();
+                const size_t copyCount = destSize < srcSize ? destSize : srcSize;
+
+                spirv::IdRefList elements;
+                elements.reserve(destSize);
+
+                for (size_t i = 0; i < copyCount; ++i)
+                {
+                    const spirv::IdRef elementId = mBuilder.getNewId(decorations);
+                    spirv::WriteCompositeExtract(
+                        mBuilder.getSpirvCurrentFunctionBlock(), elementTypeId, elementId,
+                        rightValue, {spirv::LiteralInteger(static_cast<uint32_t>(i))});
+                    elements.push_back(elementId);
+                }
+
+                const spirv::IdRef nullElement = mBuilder.getNullConstant(elementTypeId);
+                for (size_t i = copyCount; i < destSize; ++i)
+                {
+                    elements.push_back(nullElement);
+                }
+
+                valueToStore = mBuilder.getNewId(decorations);
+                spirv::WriteCompositeConstruct(mBuilder.getSpirvCurrentFunctionBlock(),
+                                               destTypeId, valueToStore, elements);
+            }
+
+            // Store into the access chain.  Since the result of the (a = b) expression is b,
+            // change the access chain to an unindexed rvalue which is |rightValue|.
+            accessChainStore(&mNodeData.back(), valueToStore, leftType);
             nodeDataInitRValue(&mNodeData.back(), rightValue, resultTypeId);
             break;
         }

@@ -57,12 +57,7 @@ static void* vulkan_load_from_pojavexec() {
 
     void *(*load_vulkan_func)() = reinterpret_cast<void*(*)()>(dlsym(lib_handle, "maybe_load_vulkan"));
     if (load_vulkan_func) {
-        vulkan_ptr_env = std::getenv("VULKAN_PTR");
-        if (vulkan_ptr_env) {
-            std::string msg = std::format("[ANGLE] Use VULKAN_PTR = {}\n", vulkan_ptr_env);
-            print_message(msg);
-        }
-        return load_vulkan_func();
+       return load_vulkan_func();
     }
 
     return nullptr;
@@ -81,7 +76,7 @@ void *OpenLibVulkan()
         return vulkan_load_from_pojavexec_result;
     }
 
-    print_message("[ANGLE] WARN: No environment variable VULKAN_PTR! vulkan_loader will load libvulkan.\n");
+    print_message("[ANGLE] WARN: No VULKAN_PTR from pojavexec! vulkan_loader will load libvulkan.\n");
 #endif
 
     constexpr const char *kLibVulkanNames[] = {
