@@ -520,7 +520,7 @@ void SetTexParameterBase(Context *context, Texture *texture, GLenum pname, const
             texture->setASTCDecodePrecision(context, ConvertToGLenum(pname, params[0]));
             break;
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             break;
     }
 }
@@ -575,7 +575,7 @@ void QuerySamplerParameterBase(const Sampler *sampler,
             *params = CastFromStateValue<ParamType>(0, sampler->getLodBias());
             break;
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             break;
     }
 }
@@ -628,7 +628,7 @@ void SetSamplerParameterBase(Context *context,
             sampler->setLodBias(context, static_cast<GLfloat>(params[0]));
             break;
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             break;
     }
 
@@ -685,7 +685,7 @@ void QueryVertexAttribBase(const VertexAttribute &attrib,
             *params = CastFromGLintStateValue<ParamType>(pname, attrib.relativeOffset);
             break;
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             break;
     }
 }
@@ -732,7 +732,7 @@ void QueryBufferParameterBase(const Buffer *buffer, BufferParam pnamePacked, Par
             *params = static_cast<ParamType>(buffer->initState() == InitState::Initialized);
             break;
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             break;
     }
 }
@@ -755,7 +755,7 @@ GLint GetCommonVariableProperty(const T &var, GLenum prop)
             return clampCast<GLint>(var.name.size() + 1u);
 
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             return GL_INVALID_VALUE;
     }
 }
@@ -798,7 +798,7 @@ GLint GetInputResourceProperty(const Program *program, GLuint index, GLenum prop
             return variable.isPatch();
 
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             return GL_INVALID_VALUE;
     }
 }
@@ -849,7 +849,7 @@ GLint GetOutputResourceProperty(const Program *program, GLuint index, const GLen
             return outputVariable.pod.isPatch;
 
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             return GL_INVALID_VALUE;
     }
 }
@@ -873,7 +873,7 @@ GLint GetTransformFeedbackVaryingResourceProperty(const Program *program,
             return clampCast<GLint>(tfVariable.nameWithArrayIndex().size() + 1);
 
         default:
-            UNREACHABLE();
+            //UNREACHABLE();
             return GL_INVALID_VALUE;
     }
 }
@@ -2426,6 +2426,7 @@ void QueryProgramInterfaceiv(const Program *program,
 
         default:
             UNREACHABLE();
+            break;
     }
 }
 
@@ -2446,6 +2447,7 @@ angle::Result SetMemoryObjectParameteriv(const Context *context,
 
         default:
             UNREACHABLE();
+            break;
     }
 
     return angle::Result::Continue;
@@ -2465,6 +2467,7 @@ void QueryMemoryObjectParameteriv(const MemoryObject *memoryObject, GLenum pname
 
         default:
             UNREACHABLE();
+            break;
     }
 }
 
@@ -3250,6 +3253,7 @@ void SetPointParameter(GLES1State *state, PointParameter pname, const GLfloat *p
             break;
         default:
             UNREACHABLE();
+            break;
     }
 }
 
@@ -3276,6 +3280,7 @@ void GetPointParameter(const GLES1State *state, PointParameter pname, GLfloat *p
             break;
         default:
             UNREACHABLE();
+            break;
     }
 }
 
