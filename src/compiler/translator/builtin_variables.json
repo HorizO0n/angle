@@ -1525,4 +1525,12 @@
             }
         }
     }
+    "gl_MultiTexCoord0": {
+      "essl_level": "COMMON_BUILTINS",
+      "type": {
+          "basic": "Float",
+          "precision": "High",
+          "qualifier": "MultiTexCoord0",
+          "primarySize": 4
+    }
 }
