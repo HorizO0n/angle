@@ -15,17 +15,29 @@
 #include <cstring>
 #include <dlfcn.h>
 #include <string>
+#include <charconv>
+#include <format>
 
 static void print_message(std::string_view msg) {
     fwrite(msg.data(), 1, msg.size(), stdout);
 }
 
 #if !defined(ANGLE_PLATFORM_APPLE)
-static void vulkan_load_from_pojavexec() {
+static void* vulkan_load_from_pojavexec() {
     const char* turnipEnv = std::getenv("ANGLE_LOAD_TURNIP");
 
+    /*if (vulkan_ptr_env && turnipEnv && std::string(turnipEnv) == "true") {
+        std::string msg = std::format("[ANGLE] Use VULKAN_PTR = {}\n", vulkan_ptr_env);
+        print_message(msg);
+        unsigned long value = 0;
+        auto [ptr, ec] = std::from_chars(vulkan_ptr_env,
+                                         vulkan_ptr_env + std::strlen(vulkan_ptr_env),
+                                         value, 16);
+        return reinterpret_cast<void*>(value);
+    }*/
+
     if (!turnipEnv || std::string(turnipEnv) != "true") {
-        return;
+        return nullptr;
     }
 
     print_message("[ANGLE] Try to dlopen libpojavexec.\n");
@@ -43,11 +55,17 @@ static void vulkan_load_from_pojavexec() {
         }
     }
 
-    void *(*load_vulkan_func)() = reinterpret_cast<void*(*)()>(
-        lib_handle ? dlsym(lib_handle, "maybe_load_vulkan") : nullptr);
+    void *(*load_vulkan_func)() = reinterpret_cast<void*(*)()>(dlsym(lib_handle, "maybe_load_vulkan"));
     if (load_vulkan_func) {
-        (void)load_vulkan_func();
+        vulkan_ptr_env = std::getenv("VULKAN_PTR");
+        if (vulkan_ptr_env) {
+            std::string msg = std::format("[ANGLE] Use VULKAN_PTR = {}\n", vulkan_ptr_env);
+            print_message(msg);
+        }
+        return load_vulkan_func();
     }
+
+    return nullptr;
 }
 #endif
 
@@ -58,8 +76,12 @@ namespace vk
 void *OpenLibVulkan()
 {
 #if !defined(ANGLE_PLATFORM_APPLE)
-    vulkan_load_from_pojavexec();
-    print_message("[ANGLE] vulkan_loader will load libvulkan.\n");
+    void* vulkan_load_from_pojavexec_result = vulkan_load_from_pojavexec();
+    if (vulkan_load_from_pojavexec_result != nullptr) {
+        return vulkan_load_from_pojavexec_result;
+    }
+
+    print_message("[ANGLE] WARN: No environment variable VULKAN_PTR! vulkan_loader will load libvulkan.\n");
 #endif
 
     constexpr const char *kLibVulkanNames[] = {
