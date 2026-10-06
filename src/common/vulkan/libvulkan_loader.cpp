@@ -23,20 +23,32 @@ static void print_message(std::string_view msg) {
 }
 
 #if !defined(ANGLE_PLATFORM_APPLE)
-static void* vulkan_load_from_pojavexec() {
-    const char* turnipEnv = std::getenv("ANGLE_LOAD_TURNIP");
+static void* vulkan_load_from_env() {
+    const char* vulkan_ptr_env = std::getenv("VULKAN_PTR");
+    const char* turnipEnv = std::getenv("ANGLE_LOAD_FROM_ENV"); // depends on launchers....
 
-    /*if (vulkan_ptr_env && turnipEnv && std::string(turnipEnv) == "true") {
+    if (vulkan_ptr_env && turnipEnv && std::string(turnipEnv) == "true") {
         std::string msg = std::format("[ANGLE] Use VULKAN_PTR = {}\n", vulkan_ptr_env);
         print_message(msg);
         unsigned long value = 0;
         auto [ptr, ec] = std::from_chars(vulkan_ptr_env,
                                          vulkan_ptr_env + std::strlen(vulkan_ptr_env),
                                          value, 16);
+        if (ec != std::errc() || value == 0) {
+            print_message("[ANGLE] VULKAN_PTR parse failed\n");
+            return nullptr;
+        }
         return reinterpret_cast<void*>(value);
-    }*/
+    }
+    
+    return nullptr;
 
-    if (!turnipEnv || std::string(turnipEnv) != "true") {
+}
+
+static void* vulkan_load_from_pojavexec() {
+    const char* turnipEnv = std::getenv("ANGLE_LOAD_VULKAN_FROM_POJAVEXEC");
+
+    if (!turnipEnv || std::string(turnipEnv) != "true") { // Turnip in Pojav Backend seems to be not able to be loaded twice, so here is false.
         return nullptr;
     }
 
@@ -64,6 +76,7 @@ static void* vulkan_load_from_pojavexec() {
 }
 #endif
 
+
 namespace angle
 {
 namespace vk
@@ -71,12 +84,16 @@ namespace vk
 void *OpenLibVulkan()
 {
 #if !defined(ANGLE_PLATFORM_APPLE)
-    void* vulkan_load_from_pojavexec_result = vulkan_load_from_pojavexec();
-    if (vulkan_load_from_pojavexec_result != nullptr) {
-        return vulkan_load_from_pojavexec_result;
+    // Turnip in Pojav Backend seems to be not able to be loaded twice.
+    vulkan_load_result = vulkan_load_from_env();
+    if (vulkan_load_result == nullptr) {
+        vulkan_load_result = vulkan_load_from_pojavexec();
+    }
+    if (vulkan_load_result != nullptr) {
+        return vulkan_load_result;
     }
 
-    print_message("[ANGLE] WARN: No VULKAN_PTR from pojavexec! vulkan_loader will load libvulkan.\n");
+    print_message("[ANGLE] WARN: No VULKAN_PTR from pojavexec or env! vulkan_loader will load libvulkan.\n");
 #endif
 
     constexpr const char *kLibVulkanNames[] = {
