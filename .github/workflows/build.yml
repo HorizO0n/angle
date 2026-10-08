@@ -15,13 +15,14 @@ on:
           - all
 
       android_arch:
-        description: Android architectures
+        description: Android architecture
         required: true
-        default: arm64+arm64-fastdebug
+        default: arm64
         type: choice
         options:
-          - arm64+arm64-fastdebug
-          - all
+          - arm32
+          - arm64
+          - both
 
       apk_path:
         description: APK path/glob
@@ -41,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ fromJSON(inputs.android_arch == 'all' && '["x86","x86_64","arm32","arm64","arm64-fastdebug"]' || '["arm64","arm64-fastdebug"]') }}
+        arch: ${{ fromJSON(inputs.android_arch == 'both' && '["arm32","arm64"]' || format('["{0}"]', inputs.android_arch)) }}
 
     steps:
       - name: Checkout
