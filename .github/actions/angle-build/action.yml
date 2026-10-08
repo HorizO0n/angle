@@ -1,25 +1,32 @@
-name: 'Build ANGLE'
-description: 'Build ANGLE for a given platform/arch'
+name: Build ANGLE
+description: Build ANGLE for a given platform/arch
 
 inputs:
   platform:
-    description: 'android | ios | linux'
+    description: android | ios | linux
     required: true
   arch:
-    description: 'Target architecture'
+    description: Target architecture
     required: true
   out-dir:
-    description: 'GN output directory name'
+    description: GN output directory name
     required: true
   upload-path:
-    description: 'Glob of files/directories to upload, relative to the out-dir'
+    description: Glob of files/directories to upload, relative to the out-dir
     required: false
     default: '*.so'
+  apk-path:
+    description: Glob of APK files to copy into the build output
+    required: false
+    default: ''
+  prepare-apk:
+    description: Prepare APK with ANGLE libraries
+    required: false
+    default: 'false'
 
 runs:
-  using: 'composite'
+  using: composite
   steps:
-
     - name: Cache depot_tools
       id: cache-depot-tools
       uses: actions/cache@main
@@ -39,24 +46,38 @@ runs:
       if: steps.cache-depot-tools.outputs.cache-hit != 'true'
       shell: bash
       run: |
+        set -e
+
         if [ "$RUNNER_OS" = "macOS" ]; then
           sudo rm -rf /Users/runner/Library/Android/sdk
         else
           sudo rm -rf /usr/local/lib/android/sdk
         fi
-        git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+
+        git clone --depth 1 \
+          https://chromium.googlesource.com/chromium/tools/depot_tools.git
 
     - name: Run gclient sync
       shell: bash
       run: |
-        export PATH=`pwd`/depot_tools:$PATH
+        set -e
+
+        export PATH="$(pwd)/depot_tools:$PATH"
+
         if [ ! -f .gclient ]; then
           python3 scripts/bootstrap.py
         fi
+
         COMMIT_COUNT=$(git ls-remote origin | wc -l)
-        echo "ANGLE_COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
-        echo "DEPOT_TOOLS_COMMIT=$(git -C depot_tools rev-parse HEAD)" >> $GITHUB_ENV
-        gclient sync --no-history --shallow --reset --force
+
+        echo "ANGLE_COMMIT_COUNT=$COMMIT_COUNT" >> "$GITHUB_ENV"
+        echo "DEPOT_TOOLS_COMMIT=$(git -C depot_tools rev-parse HEAD)" >> "$GITHUB_ENV"
+
+        gclient sync \
+          --no-history \
+          --shallow \
+          --reset \
+          --force
 
     - name: Apply patches
       shell: bash
@@ -67,49 +88,149 @@ runs:
       uses: hendrikmuhs/ccache-action@main
       with:
         key: angle-ccache-${{ runner.os }}-${{ inputs.platform }}-${{ inputs.arch }}
-        max-size: '8G'
+        max-size: 8G
         update-package-index: true
         restore: true
-        variant: 'ccache'
+        variant: ccache
         save: true
         append-timestamp: true
         install: 'yes'
-        job-summary: 'CCache Statistics'
+        job-summary: CCache Statistics
 
     - name: Build ANGLE
       shell: bash
       run: |
-        export PATH=`pwd`/depot_tools:$PATH
+        set -e
+
+        export PATH="$(pwd)/depot_tools:$PATH"
+
         ccache -z
-        cp .gn .gn.bak 2>/dev/null; if grep -q 'expand_directory_allowlist' .gn 2>/dev/null; then sed -i 's|]|,\n  "//build/modules/BUILD.gn"\n]|' .gn; else echo 'expand_directory_allowlist = [ "//build/modules/BUILD.gn" ]' >> .gn; fi
-        gn gen out/${{ inputs.out-dir }} --threads=8
-        gn args out/${{ inputs.out-dir }} --list --short
-        autoninja -C out/${{ inputs.out-dir }} -j 8
+
+        cp .gn .gn.bak 2>/dev/null || true
+
+        if grep -q 'expand_directory_allowlist' .gn 2>/dev/null; then
+          sed -i 's|]|,\n  "//build/modules/BUILD.gn"\n]|' .gn
+        else
+          echo 'expand_directory_allowlist = [ "//build/modules/BUILD.gn" ]' >> .gn
+        fi
+
+        gn gen "out/${{ inputs.out-dir }}" --threads=8
+        gn args "out/${{ inputs.out-dir }}" --list --short
+
+        autoninja \
+          -C "out/${{ inputs.out-dir }}" \
+          -j 8
 
     - name: List build outputs
       if: success()
       shell: bash
       run: |
         echo "=== Top-level ==="
-        ls -la out/${{ inputs.out-dir }}/ || true
+        ls -la "out/${{ inputs.out-dir }}/" || true
+
         echo "=== Frameworks ==="
-        find out/${{ inputs.out-dir }} -maxdepth 3 -name "*.framework" -type d || true
+        find "out/${{ inputs.out-dir }}" \
+          -maxdepth 3 \
+          -name "*.framework" \
+          -type d || true
+
         echo "=== Dylibs ==="
-        find out/${{ inputs.out-dir }} -maxdepth 3 -name "*.dylib" || true
+        find "out/${{ inputs.out-dir }}" \
+          -maxdepth 3 \
+          -name "*.dylib" || true
+
         echo "=== .so ==="
-        find out/${{ inputs.out-dir }} -maxdepth 3 -name "*.so" || true
+        find "out/${{ inputs.out-dir }}" \
+          -maxdepth 3 \
+          -name "*.so" || true
+
+    - name: Prepare APK directory
+      if: inputs.platform == 'android' && inputs.apk-path != ''
+      shell: bash
+      run: |
+        set -e
+
+        mkdir -p "out/${{ inputs.out-dir }}/apks"
+
+        cp ${{ inputs.apk-path }} \
+          "out/${{ inputs.out-dir }}/apks/"
+
+        echo "=== APKs ==="
+        ls -lh "out/${{ inputs.out-dir }}/apks/"
+
+    - name: Prepare APK with ANGLE libraries
+      if: inputs.platform == 'android' && inputs.prepare-apk == 'true' && inputs.apk-path != ''
+      shell: bash
+      run: |
+        set -e
+
+        sudo apt-get update
+
+        sudo apt-get install -y \
+          apktool \
+          zipalign \
+          apksigner
+
+        mkdir -p apk-work
+
+        APK=$(find "out/${{ inputs.out-dir }}/apks" \
+          -maxdepth 1 \
+          -name "*.apk" \
+          | head -n 1)
+
+        if [ -z "$APK" ]; then
+          echo "No APK found"
+          exit 1
+        fi
+
+        echo "Using APK: $APK"
+
+        apktool d \
+          -f \
+          "$APK" \
+          -o apk-work/decoded
+
+        mkdir -p "apk-work/decoded/lib/${{ inputs.arch }}"
+
+        find "out/${{ inputs.out-dir }}" \
+          -maxdepth 2 \
+          -name "*.so" \
+          -exec cp {} "apk-work/decoded/lib/${{ inputs.arch }}/" \;
+
+        apktool b \
+          apk-work/decoded \
+          -o "out/${{ inputs.out-dir }}/apks/angle-${{ inputs.arch }}.apk"
+
+        zipalign -f 4 \
+          "out/${{ inputs.out-dir }}/apks/angle-${{ inputs.arch }}.apk" \
+          "out/${{ inputs.out-dir }}/apks/angle-${{ inputs.arch }}-aligned.apk"
+
+        apksigner sign \
+          --ks "$HOME/.android/debug.keystore" \
+          --ks-pass pass:android \
+          "out/${{ inputs.out-dir }}/apks/angle-${{ inputs.arch }}-aligned.apk"
+
+        echo "=== Final APK ==="
+        ls -lh "out/${{ inputs.out-dir }}/apks/"
 
     - name: Dump logs on failure
       if: failure()
       shell: bash
       run: |
-        find out/${{ inputs.out-dir }} -name "siso_output" -exec cat {} \;
-        chmod +x ./out/${{ inputs.out-dir }}/siso_failed_commands.sh
-        ./out/${{ inputs.out-dir }}/siso_failed_commands.sh
+        find "out/${{ inputs.out-dir }}" \
+          -name "siso_output" \
+          -exec cat {} \;
 
-    - name: Upload angle
+        if [ -f "./out/${{ inputs.out-dir }}/siso_failed_commands.sh" ]; then
+          chmod +x "./out/${{ inputs.out-dir }}/siso_failed_commands.sh"
+          "./out/${{ inputs.out-dir }}/siso_failed_commands.sh"
+        fi
+
+    - name: Upload ANGLE
       uses: actions/upload-artifact@main
       with:
         name: angle-${{ inputs.platform }}-${{ inputs.arch }}-${{ github.run_number }}
-        path: out/${{ inputs.out-dir }}/${{ inputs.upload-path }}
+        path: |
+          out/${{ inputs.out-dir }}/${{ inputs.upload-path }}
+          out/${{ inputs.out-dir }}/apks/*.apk
         if-no-files-found: warn
