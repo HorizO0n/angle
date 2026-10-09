@@ -247,7 +247,7 @@ class MRUCache : public MRUCacheBase<KeyType, PayloadType, CompareType>
 template <class KeyType, class ValueType, class HashType>
 struct MRUCacheHashMap
 {
-    typedef absl::flat_hash_map<KeyType, ValueType, HashType> Type;
+    typedef std::unordered_map<KeyType, ValueType, HashType> Type;
 };
 
 // This class is similar to MRUCache, except that it uses std::unordered_map as
