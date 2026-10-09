@@ -161,7 +161,7 @@
           ndk_api_level_at_least_26 = false
           host_toolchain_msan_track_origins = 0
           angle_64bit_current_cpu = false
-          clang_version = "23"
+          #clang_version = "23"
           enable_dsyms = false
           angle_vulkan_tools_dir = ""
           angle_vulkan_validation_layers_dir = ""
