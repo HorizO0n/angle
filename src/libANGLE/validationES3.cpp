@@ -24,6 +24,7 @@
 #include "libANGLE/validationES.h"
 #include "libANGLE/validationES3.h"
 #include "platform/autogen/FrontendFeatures_autogen.h"
+#include <iostream>
 
 using namespace angle;
 
