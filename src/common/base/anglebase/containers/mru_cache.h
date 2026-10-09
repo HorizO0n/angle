@@ -28,9 +28,6 @@
 #include "anglebase/logging.h"
 #include "anglebase/macros.h"
 
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
-
 namespace angle
 {
 
