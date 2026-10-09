@@ -171,7 +171,7 @@
           toolchain_supports_rust_thin_lto = false ####
           rust_force_head_revision = false ####
           rustc_version = "" #1.92.0
-          android_sdk_release = "b"
+          #android_sdk_release = "b"
           chromeos_afdo_platform = ""
           angle_use_custom_libvulkan = false #
           enable_precompiled_headers = false
