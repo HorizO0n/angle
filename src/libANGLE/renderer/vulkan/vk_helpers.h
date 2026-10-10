@@ -21,9 +21,6 @@
 
 #include <functional>
 
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
-
 namespace gl
 {
 class OwnerImageIndex;
